@@ -23,7 +23,6 @@
 
 # 3 Check if loadcase exists
 # 3 When edge is curved; use edge nodes if they are not on top of each other.
-# 3 When subset, allow option to enable "red" edges instead of "yellow, purple and black" ones to contain welds
 # 3 possible huge time gain by using ElementValues instead of ElementValue
 # 3 import cProfile of profiler, eerst downloaden. Zodat je de echte versie hebt en fatsoenlijk kan profilen.
 # 3 fix bug where all the readonly's are on their default value when just inserted; maybe do keypress up and down?
@@ -131,23 +130,74 @@ def validateLoadCases(result, property):
     except:
         ExtAPI.Application.LogWarning("Invalid Load Cases.")
         property.Value = str(DefaultLoadCases())
-    
-def getNormalDirection(edge,face):
+ 
+def getNormalDirection(edge,elemId, Mesh):
     # returns the unitvector perpendicular to the edge and in the plane of the face
-    plateNormal = (face.Normals[0], \
-                   face.Normals[1], \
-                   face.Normals[2])
-    edgeVector = (edge.StartVertex.X - edge.EndVertex.X,
-                  edge.StartVertex.Y - edge.EndVertex.Y,
-                  edge.StartVertex.Z - edge.EndVertex.Z)
-    edgeVectorLength = ( edgeVector[0]**2+edgeVector[1]**2+edgeVector[2]**2 ) ** ( 0.5 )
-    edgeUnit = (edgeVector[0]/edgeVectorLength,
-                edgeVector[1]/edgeVectorLength,
-                edgeVector[2]/edgeVectorLength)
-    Norm = (edgeUnit[1] * plateNormal[2] - edgeUnit[2] * plateNormal[1],
-            edgeUnit[2] * plateNormal[0] - edgeUnit[0] * plateNormal[2],
-            edgeUnit[0] * plateNormal[1] - edgeUnit[1] * plateNormal[0])
-    return (Norm,edgeUnit,plateNormal)
+    CurveType = edge.CurveType
+    ExtAPI.Log.WriteMessage("{0}: getNormalDirection of edge {1}, element {2}".format(datetime.now(), edge.Id, elemId))
+    if CurveType != CurveType.GeoCurveLine: 
+        # The element and face method seem just as fast. Lets go element all the way?
+        if CurveType == CurveType.GeoCurveBSpline or CurveType == CurveType.GeoCurveCircle:
+            # define two edge nodes (n1, n2)
+            edgeNodeIds = set(Mesh.MeshRegionById(edge.Id).NodeIds)
+            elemNodeIds = set(Mesh.ElementById(elemId).NodeIds)
+            e_e_NodeIds = list(edgeNodeIds & elemNodeIds) # use .pop on set instead ...
+            if len(e_e_NodeIds) < 2:
+                ExtAPI.Application.LogWarning("Error in function getNormalDirection: element {1} somehow has less than 2 nodes on edge {0} ".format(edge.Id, elemId))
+            # define vector of edge nodes (A) 
+            n1 = Mesh.NodeById(e_e_NodeIds[0])
+            n2 = Mesh.NodeById(e_e_NodeIds[1])
+            A = ( n2.X - n1.X,
+                  n2.Y - n1.Y,
+                  n2.Z - n1.Z)
+            A_length = ( A[0]**2+A[1]**2+A[2]**2 ) ** ( 0.5 ) # use sqrt(sum(tuple(x**2 for x in A))) instead...
+            A_unit = (A[0]/A_length,
+                        A[1]/A_length,
+                        A[2]/A_length)
+            # take an additional node which is not in line (n3)
+            additional_nodeIds = list(elemNodeIds ^ elemNodeIds & edgeNodeIds)
+            additional_nodeId = additional_nodeIds[0]
+            n3 = Mesh.NodeById(additional_nodeId)
+            # define vector of n1 to n3 (B)
+            B = (n3.X - n1.X,
+                 n3.Y - n1.Y,
+                 n3.Z - n1.Z)
+            # define component of B that is in A (C)
+            BdotA_unit = sum([x*y for x,y in zip(B,A_unit)])
+            C = [BdotA_unit*A_unit[n] for n in range(3)]
+            # define component of B that is not in A, substract C from B (D)
+            D = (B[0] - C[0],
+                 B[1] - C[1],
+                 B[2] - C[2])
+            # unitize it
+            D_length = ( D[0]**2+D[1]**2+D[2]**2 ) ** ( 0.5 )
+            D_unit = (D[0]/D_length, D[1]/D_length, D[2]/D_length)
+            # get third vector perpendicular to the two
+            E_unit = (   A_unit[1] * D_unit[2] - A_unit[2] * D_unit[1],
+                                A_unit[2] * D_unit[0] - A_unit[0] * D_unit[2],
+                                A_unit[0] * D_unit[1] - A_unit[1] * D_unit[0])
+            ExtAPI.Log.WriteMessage("{0}: endNormalDirection curve".format(datetime.now()))
+            return (D_unit,A_unit,E_unit)        # normal, length, cross
+        else:
+            ExtAPI.Application.LogWarning("Error in function getNormalDirection: CurveType of edge {0} is not GeoCurveLine, GeoCurveBSpline or GeoCurveCircle. Element {1} is calculated with fake weld direction".format(edge.Id, elemId))
+            return ((0,0,1),(0,1,0),(1,0,0))
+    else:
+        edgeVector = (edge.StartVertex.X - edge.EndVertex.X,
+                      edge.StartVertex.Y - edge.EndVertex.Y,
+                      edge.StartVertex.Z - edge.EndVertex.Z)
+        edgeVectorLength = ( edgeVector[0]**2+edgeVector[1]**2+edgeVector[2]**2 ) ** ( 0.5 )
+        edgeUnit = (edgeVector[0]/edgeVectorLength,
+                    edgeVector[1]/edgeVectorLength,
+                    edgeVector[2]/edgeVectorLength)
+        face = FaceByElemId[elemId]
+        plateNormal = (face.Normals[0], \
+                       face.Normals[1], \
+                       face.Normals[2])
+        Norm = (edgeUnit[1] * plateNormal[2] - edgeUnit[2] * plateNormal[1],
+                edgeUnit[2] * plateNormal[0] - edgeUnit[0] * plateNormal[2],
+                edgeUnit[0] * plateNormal[1] - edgeUnit[1] * plateNormal[0])
+        ExtAPI.Log.WriteMessage("{0}: endNormalDirection straigth".format(datetime.now()))
+        return (Norm,edgeUnit,plateNormal)
 
 class Tensor():
     def __init__(self, t, u=None):
@@ -179,10 +229,10 @@ def createDB(result,step):
     global WeldElements
     global FaceByElemId                                                                                   
     global EdgesByElemId
+    Mesh = result.Analysis.MeshData
     if WeldElements == []:  # deze loop naar een functie
         ExtAPILogWriteMessage("CreateDB: WeldElementLoop")
         EdgeOfModel = result.Properties.GetByName("EdgeOfModel").Value
-        Mesh = result.Analysis.MeshData
         GeoData = result.Analysis.GeoData
         for elem in result.Analysis.MeshData.ElementIds:                                                    
             EdgesByElemId[elem] = []            
@@ -190,29 +240,22 @@ def createDB(result,step):
             for part in assembly.Parts:
                 for body in part.Bodies:
                     if body.Suppressed == True:
-                        continue
+                        continue # if the body is suppressed
                     if not str(body.BodyType) == "GeoBodySheet":
-                        continue
+                        continue # if the body is not a shell
                     for face in body.Faces:     #ASLV
                         for edge in face.Edges:     #LSLA
                             if result.Analysis.MeshData.MeshRegionById(edge.Id).NodeCount == 0: 
-                                continue #Edges which are skipped with meshing
+                                continue # edges which are skipped with meshing
                             if edge.Faces.Count < 2 and EdgeOfModel == "Exclude":    
-                                continue #If the edge doesn't have multiple faces, it's not a weld
-                            if not edge.Vertices.Count == 2:
-                                continue
-                            if edge.Vertices[0].Id == edge.Vertices[1].Id:
-                                continue
-                            NodeIdsOnEdge = Mesh.MeshRegionById(edge.Id).NodeIds
-                            # Actually this edgebyelem story creates more mess in the code than it cleans the result
+                                continue # if the edge doesn't have multiple faces; it's not a weld
+                            NodeIdsOnEdge = set(Mesh.MeshRegionById(edge.Id).NodeIds)
                             for NodeId in NodeIdsOnEdge:     #NSLL
                                 for ConnectedElementId in Mesh.NodeById(NodeId).ConnectedElementIds:    #ESLN 
-                                    nodesOnTheLine = 0
-                                    for NodeIdeep in Mesh.ElementById(ConnectedElementId).NodeIds:
-                                        if NodeIdeep in NodeIdsOnEdge:
-                                            nodesOnTheLine += 1
-                                    if nodesOnTheLine ==1:
-                                        continue
+                                    NodeIdsOfElement = set(Mesh.ElementById(ConnectedElementId).NodeIds)
+                                    NodeIdsOfElementOnEdge = NodeIdsOnEdge & NodeIdsOfElement
+                                    if len(NodeIdsOfElementOnEdge) == 1 or NodeIdsOfElementOnEdge == NodeIdsOfElement:
+                                        continue # if weld direction not clear
                                     if not edge.Id in [x.Id for x in EdgesByElemId[ConnectedElementId]]:
                                         ExtAPILogWriteMessage("CreateDB: EdgesByElemId")
                                         EdgesByElemId[ConnectedElementId].append(edge)
@@ -294,7 +337,7 @@ def createDB(result,step):
                         if EdgeByElem == "Envelope":
                             CombinedSqStress = 0
                             for edge in EdgesByElemId[elemId]:
-                                units = getNormalDirection(edge, FaceByElemId[elemId]) 
+                                units = getNormalDirection(edge, elemId, Mesh) 
                                 TensorMid.Rotate(units)
                                 NormalStress    = TensorMid.Normal
                                 LongStress      = TensorMid.Long
@@ -312,7 +355,7 @@ def createDB(result,step):
                         ExtAPILogWriteMessage("CreateDB: EnvelopeStop")
                             
                     # Calculate the actual weld
-                    units = getNormalDirection(Edge, FaceByElemId[elemId])
+                    units = getNormalDirection(Edge, elemId, Mesh)
                     # don't use edge but edge nodes? Check if edge is GeoCurveLine or GeoCurveCircle
                     TensorMid.Rotate(units)
                     TensorTop.Rotate(units)
