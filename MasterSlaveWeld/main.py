@@ -1,10 +1,9 @@
-# 0 Philosophy: Calculate everything, design later.
-# 0 work out a standard for adjectiveNoun or AdjectiveNoun
-# 0 Compile, Quick, Correct
+# Philosophy: Calculate everything, design later.
+# Compile, Quick, Correct
 
 # T O D O
 
-
+# 0 Fatigue K factor klopt niet
 
 # 1  Add 'beta' option, a factor on FW.
 # 1.3 enable unselecting elements between analysises. -- zie MultiWeldScaleScope
@@ -22,7 +21,6 @@
 # 3 When edge is curved; use edge nodes if they are not on top of each other.
 # 3 When subset, allow option to enable "red" edges instead of "yellow, purple and black" ones to contain welds
 # 3 possible huge time gain by using ElementValues instead of ElementValue
-# 3 move createdb to onevaluate
 
 #TODO: named selection zodat je alleen op een subsectie kan draaien 
 # -> NOPE, scope all bodies is bugy
@@ -42,7 +40,7 @@ EdgesByElemId = {}
 NotchCases = ["K0","K1","K2","K3"]
 
 def ExtAPILogWriteMessage(string):
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+string)
+    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+string)
     pass
 
 def ClearLog():
@@ -81,15 +79,23 @@ def DefaultLoadCases():
     
 def createMaster(analysis):
     # dit werkt alleen mits je alles in 1 analysis flikkert.
+    b = [] # die kut lui geven soms ook een analyse mee die kapot is. Die filter ik er nu dus uit met die try-except.
+    for a in ExtAPI.DataModel.AnalysisList:
+        try: 
+            a.Name
+        except:
+            continue
+        for ro in a.ResultObjects:
+            b.append(ro)    
     for n in [str(n) for n in range(1000)]:
-        if n not in [ro.Properties.GetByName("Identifier").Value for ro in analysis.ResultObjects if ro != None and ro.Name == "Master"]:
+        if n not in [ro.Properties.GetByName("Identifier").Value for ro in b if ro != None and ro.Name == "Master"]:
             break
     LoadCases = DefaultLoadCases()
     ResultObject = analysis.CreateResultObject("Master")
-    ResultObject.Properties.GetByName("Identifier").Value = n
-    ResultObject.Properties.GetByName("lc").Value = str(LoadCases)
     for x in ["FatigueCalculation","lc","lcFatigue","CraneGroup","addSlaves","EdgeByElem","EdgeOfModel"]:
         ResultObject.Properties.GetByName(x).ReadOnly = False
+    ResultObject.Properties.GetByName("Identifier").Value = n
+    ResultObject.Properties.GetByName("lc").Value = str(LoadCases)
     global Data
     Data.pop(n, None) 
     pass
@@ -127,18 +133,31 @@ def getNormalDirection(edge,face):
     edgeUnit = (edgeVector[0]/edgeVectorLength,
                 edgeVector[1]/edgeVectorLength,
                 edgeVector[2]/edgeVectorLength)
-    Norm = (plateNormal[1] * edgeUnit[2] - plateNormal[2] * edgeUnit[1],
-            plateNormal[2] * edgeUnit[0] - plateNormal[0] * edgeUnit[2],
-            plateNormal[0] * edgeUnit[1] - plateNormal[1] * edgeUnit[0])
+    Norm = (edgeUnit[1] * plateNormal[2] - edgeUnit[2] * plateNormal[1],
+            edgeUnit[2] * plateNormal[0] - edgeUnit[0] * plateNormal[2],
+            edgeUnit[0] * plateNormal[1] - edgeUnit[1] * plateNormal[0])
     return (Norm,edgeUnit,plateNormal)
-    
-def inProduct(F,u):
-    A = F[0]*u[0] + F[1]*u[1] + F[2]*u[2]
-    A = A*1.0
-    return A
-    
-def VM(sigma_n, sigma_m, tau_l, tau_n, tau_m):
-    return sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
+
+class Tensor():
+    def __init__(self, t, u=None):
+        self.Tensor = t
+        self.Rotated = None
+        self.Normal = None
+        self.Long = None
+        if u:
+            self.Rotate(u)
+    def Rotate(self,u):
+        self.Rotated = self.mmult(self.mmult(u,self.Tensor),zip(*u))
+        self.Normal = self.Rotated[0][0]
+        self.Long = self.Rotated[0][1]
+    def mmult(self,m1,m2):
+        M = [[0,0,0],[0,0,0],[0,0,0]]
+        for i in range(len(m2)):
+            for j in range(len(m2[0])):
+                for k in range(len(m1)):
+                    M[i][j] += m1[i][k]*m2[k][j]
+                # M[i][j] = round(M[i][j]) # easier to read for debugging
+        return M
 
 def createDB(result,SelemId):
     ExtAPILogWriteMessage("WTF")
@@ -188,8 +207,9 @@ def createDB(result,SelemId):
                             FaceByElemId[ElementId] = face
         ExtAPILogWriteMessage("CreateDB: WeldElements")
         for elem in Mesh.ElementIds:                                       
-            if elem in FaceByElemId:
-                if not EdgesByElemId[elem].Count == 0:
+            if not EdgesByElemId[elem].Count == 0:
+                if elem in FaceByElemId:
+
                     if int(Mesh.ElementById(elem).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
                         WeldElements.append(elem)
     Identifier = result.Properties.GetByName("Identifier").Value
@@ -205,8 +225,8 @@ def createDB(result,SelemId):
         # alternatively, maybe ask all element results in one ElementValues with an s.
         ExtAPILogWriteMessage("CreateDB: Identifier FirstLoop")
         for analysisName in LoadCases: 
-            Analysis = ExtAPI.DataModel.AnalysisByName(analysisName)
             Data[Identifier][analysisName] = {}
+            Analysis = ExtAPI.DataModel.AnalysisByName(analysisName)
             for resultSet in LoadCases[analysisName]:
                 Data[Identifier][analysisName][resultSet] = {}
                 #maybe ask stress of the nodes who are actual on the line?? 
@@ -221,24 +241,33 @@ def createDB(result,SelemId):
                     
                     plateThickness = FaceByElemId[elemId].Body.Thickness * 1000   # to mm, this is so ugly
                     # stresses are no longer abs() -> check rest of this indent careful for consequences
-                    sxTotal = resultStress.ElementValue(elemId,"X")
-                    syTotal = resultStress.ElementValue(elemId,"Y")
-                    szTotal = resultStress.ElementValue(elemId,"Z")
-                    sx = sum(sxTotal,0.0)/12  
-                    sy = sum(syTotal,0.0)/12  
-                    sz = sum(szTotal,0.0)/12  
-                    sxTop = sum(sxTotal[0:4],0.0)/4  
-                    syTop = sum(syTotal[0:4],0.0)/4  
-                    szTop = sum(szTotal[0:4],0.0)/4  
-                    sxBot = sum(sxTotal[4:8],0.0)/4
-                    syBot = sum(syTotal[4:8],0.0)/4
-                    szBot = sum(szTotal[4:8],0.0)/4
-                    sxMid = sum(sxTotal[8:12],0.0)/4
-                    syMid = sum(syTotal[8:12],0.0)/4
-                    szMid = sum(szTotal[8:12],0.0)/4
-                    sxy = sum(resultStress.ElementValue(elemId,"XY"),0.0)/12 
-                    syz = sum(resultStress.ElementValue(elemId,"YZ"),0.0)/12 
-                    sxz = sum(resultStress.ElementValue(elemId,"XZ"),0.0)/12 
+                    sxxTotal = resultStress.ElementValue(elemId,"X")
+                    syyTotal = resultStress.ElementValue(elemId,"Y")
+                    szzTotal = resultStress.ElementValue(elemId,"Z")
+                    sxyTotal = resultStress.ElementValue(elemId,"XY")
+                    syzTotal = resultStress.ElementValue(elemId,"YZ")
+                    sxzTotal = resultStress.ElementValue(elemId,"XZ")
+                    
+                    #0:4 = top plane, 4:8 = bottom plane, 8:12 = mid plane
+                    sxx = sum(sxxTotal[0:4],0.0)/4  
+                    syy = sum(syyTotal[0:4],0.0)/4  
+                    szz = sum(szzTotal[0:4],0.0)/4  
+                    sxy = sum(sxyTotal[0:4],0.0)/4  
+                    syz = sum(syzTotal[0:4],0.0)/4  
+                    sxz = sum(sxzTotal[0:4],0.0)/4  
+                    TensorTop = Tensor( ((  sxx,    sxy,    sxz)
+                                        ,(  sxy,    syy,    syz)
+                                        ,(  sxz,    syz,    szz))  )
+
+                    sxx = sum(sxxTotal[8:12],0.0)/4
+                    syy = sum(syyTotal[8:12],0.0)/4
+                    szz = sum(szzTotal[8:12],0.0)/4
+                    sxy = sum(sxyTotal[8:12],0.0)/4
+                    syz = sum(syzTotal[8:12],0.0)/4
+                    sxz = sum(sxzTotal[8:12],0.0)/4
+                    TensorMid = Tensor( ((  sxx,    sxy,    sxz)
+                                        ,(  sxy,    syy,    syz)
+                                        ,(  sxz,    syz,    szz))  )
                     ExtAPILogWriteMessage("CreateDB: Got Stresses")
                     
                     # Determine the edge to calculate with; for elements can be with multiple edges
@@ -251,8 +280,9 @@ def createDB(result,SelemId):
                             CombinedSqStress = 0
                             for edge in EdgesByElemId[elemId]:
                                 units = getNormalDirection(edge, FaceByElemId[elemId]) 
-                                NormalStress = inProduct([sx,sy,sz],units[0])
-                                LongStress =  inProduct([sxy,syz,sxz],units[1]) 
+                                TensorMid.Rotate(units)
+                                NormalStress    = TensorMid.Normal
+                                LongStress      = TensorMid.Long
                                 newCombinedSqStress = NormalStress**2 + 3*LongStress**2
                                 if newCombinedSqStress >= CombinedSqStress:
                                     EdgeWithMaxWeldThickness = edge
@@ -262,40 +292,45 @@ def createDB(result,SelemId):
                             Edge = max([x.Id for x in EdgesByElemId[elemId]])
                         elif EdgeByElem == "Low Edge Ids":
                             Edge = min([x.Id for x in EdgesByElemId[elemId]])
+                        elif EdgeByElem == "Random Edge Id":
+                            Edge = EdgesByElemId[elemId][0]
                         ExtAPILogWriteMessage("CreateDB: EnvelopeStop")
                             
                     # Calculate the actual weld
-                    units = getNormalDirection(Edge, FaceByElemId[elemId])  
+                    units = getNormalDirection(Edge, FaceByElemId[elemId])
                     # don't use edge but edge nodes? Check if edge is GeoCurveLine or GeoCurveCircle
-                    NormalStress = inProduct([sxMid,syMid,szMid],units[0])
-                    LongStress =  inProduct([sxy,syz,sxz],units[0])  
+                    TensorMid.Rotate(units)
+                    TensorTop.Rotate(units)
+                    
+                    NormalStress    = TensorMid.Normal
+                    LongStress      = TensorMid.Long
                     EquivalentStress = ( NormalStress**2+3*LongStress**2 )**(0.5) 
                     weldThickness = ( EquivalentStress * plateThickness ) / (allowableStress)
                     Data[Identifier][analysisName][resultSet][elemId]["Equivalent (von-Mises) Stress"]           = EquivalentStress
-                    Data[Identifier][analysisName][resultSet][elemId]["Axial Stress"]                            = NormalStress
-                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Stress"]                     = LongStress
+                    Data[Identifier][analysisName][resultSet][elemId]["Axial Stress"]                            = NormalStress #abs?
+                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Stress"]                     = LongStress #abs?
                     Data[Identifier][analysisName][resultSet][elemId]["Throat Thickness according to LasE2.mac"] = weldThickness
                     
-                    NormalForce = abs( NormalStress * plateThickness )
-                    LongForce = abs( LongStress * plateThickness )
-                    Moment = abs( (inProduct([sxTop,syTop,szTop],units[0]) - NormalStress) * plateThickness**2 * 6**(-1) )
-                    Data[Identifier][analysisName][resultSet][elemId]["Axial Force mm^-1"]           = NormalForce
-                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Moment mm^-1"]   = Moment
-                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Force mm^-1"]    = LongForce
+                    NormalForce = NormalStress * plateThickness
+                    LongForce = LongStress * plateThickness
+                    Moment = (TensorTop.Normal - TensorMid.Normal) * plateThickness**2 * 6**(-1) 
+                    Data[Identifier][analysisName][resultSet][elemId]["Axial Force mm^-1"]           = NormalForce #abs?
+                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Moment mm^-1"]   = Moment #abs?
+                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Force mm^-1"]    = LongForce #abs?
                     ExtAPILogWriteMessage("CreateDB: Calculated Forces")
                     # Get unit vectors for debuggin purpose
-                    # unitNormalScalar = round(abs(9*units[0][0]))*100 \
-                                     # + round(abs(9*units[0][1]))*10 \
-                                     # + round(abs(9*units[0][2]))
-                    # unitCrossScalar  = round(abs(9*units[2][0]))*100 \
-                                     # + round(abs(9*units[2][1]))*10 \
-                                     # + round(abs(9*units[2][2]))
-                    # unitLongScalar   = round(abs(9*units[1][0]))*100 \
-                                     # + round(abs(9*units[1][1]))*10 \
-                                     # + round(abs(9*units[1][2]))
-                    # Data[Identifier][analysisName][resultSet][elemId]["Axial Unit Vector"]           = unitNormalScalar
-                    # Data[Identifier][analysisName][resultSet][elemId]["Cross Unit Vector"]           = unitCrossScalar
-                    # Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Unit Vector"]    = unitLongScalar
+                    unitNormalScalar = round(abs(9*units[0][0]))*100 \
+                                     + round(abs(9*units[0][1]))*10 \
+                                     + round(abs(9*units[0][2]))
+                    unitCrossScalar  = round(abs(9*units[2][0]))*100 \
+                                     + round(abs(9*units[2][1]))*10 \
+                                     + round(abs(9*units[2][2]))
+                    unitLongScalar   = round(abs(9*units[1][0]))*100 \
+                                     + round(abs(9*units[1][1]))*10 \
+                                     + round(abs(9*units[1][2]))
+                    Data[Identifier][analysisName][resultSet][elemId]["Axial Unit Vector"]           = unitNormalScalar
+                    Data[Identifier][analysisName][resultSet][elemId]["Cross Unit Vector"]           = unitCrossScalar
+                    Data[Identifier][analysisName][resultSet][elemId]["Longitudinal Unit Vector"]    = unitLongScalar
 
         ExtAPILogWriteMessage("CreateDB: Calculated Forces")
         Fatigue = False if result.Properties.GetByName("FatigueCalculation").Value == "No" else True
@@ -323,27 +358,17 @@ def createDB(result,SelemId):
                         ax1s = [abs(d["ax1"]) for d in WeldStressDirections]
                         ax2s = [abs(d["ax2"]) for d in WeldStressDirections]
                         lngs = [abs(d["lng"]) for d in WeldStressDirections]
-                        ExtAPILogWriteMessage("1")
                         maxAx1 = max(ax1s)
                         maxAx2 = max(ax2s)
                         maxLng = max(lngs)
-                        ExtAPILogWriteMessage("2")
                         AxFactor1 = maxAx1/(maxAx1+maxLng) if maxAx1+maxLng != 0 else 1
-                        ExtAPILogWriteMessage("3")
                         AxFactor2 = maxAx2/(maxAx2+maxLng) if maxAx2+maxLng != 0 else 1
-                        ExtAPILogWriteMessage("4")
                         K_ax1 = min(ax1s)/max(ax1s) if abs(min(ax1s)) < max(ax1s) and max(ax1s) != 0 else max(ax1s)/min(ax1s) if min(ax1s) != 0 else 1
-                        ExtAPILogWriteMessage("5")
                         K_ax2 = min(ax2s)/max(ax2s) if abs(min(ax2s)) < max(ax2s) and max(ax2s) != 0 else max(ax2s)/min(ax2s) if min(ax2s) != 0 else 1
-                        ExtAPILogWriteMessage("6")
                         K_lng = min(lngs)/max(lngs) if abs(min(lngs)) < max(lngs) and max(lngs) != 0 else max(lngs)/min(lngs) if max(lngs) != 0 else 1
-                        ExtAPILogWriteMessage("7")
                         K_1 = K_ax1 * AxFactor1 + K_lng * (1 - AxFactor1)  
-                        ExtAPILogWriteMessage("8")
                         K_2 = K_ax2 * AxFactor2 + K_lng * (1 - AxFactor2)  
-                        ExtAPILogWriteMessage("9")
                         K = str(round(min(K_1, K_2),1))
-                        ExtAPILogWriteMessage("10")
                         Ks[elemId] = K
                         ExtAPILogWriteMessage("CreateDB: ISL K finish")
                 LoadCases = LoadCasesFatigue if notchCase != "Static" else LoadCasesStatic
@@ -364,9 +389,6 @@ def createDB(result,SelemId):
                                     tau_l       = LongForce / (2 * a)
                                     b           = plateThickness + 0.67 * a * 1.414
                                     sigma_m     = tau_m = Moment / (1.414 * a * b)
-                                    sigma_vm1   = sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
-                                    sigma_vm2   = sqrt((sigma_n - sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n - tau_m)**2)
-                                    sigma_vm    = max(sigma_vm1, sigma_vm2)
                                 elif weldType == "2xPP":
                                     sigma_n     = NormalForce / (2 * a)
                                     tau_l       = LongForce / (2 * a)
@@ -374,17 +396,14 @@ def createDB(result,SelemId):
                                     if b == 0: continue
                                     sigma_m = Moment / (a * b)  
                                     tau_n = tau_m = 0
-                                    sigma_vm1   = sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
-                                    sigma_vm2   = sqrt((sigma_n - sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n - tau_m)**2)
-                                    sigma_vm    = max(sigma_vm1, sigma_vm2)
                                 elif weldType == "1xPP":
                                     sigma_n     = NormalForce / a
                                     tau_l       = LongForce / a
                                     sigma_m     = Moment / (4**(-1) * a**2)
                                     tau_n = tau_m = 0
-                                    sigma_vm1   = sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
-                                    sigma_vm2   = sqrt((sigma_n - sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n - tau_m)**2)
-                                    sigma_vm    = max(sigma_vm1, sigma_vm2)
+                                sigma_vm1   = sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
+                                sigma_vm2   = sqrt((sigma_n - sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n - tau_m)**2)
+                                sigma_vm    = max(sigma_vm1, sigma_vm2)
                                 if sigma_vm < allowableStress: #  or a == weldThroats[len(weldThroats)-1]
                                     axialStressInWeld   = sqrt(sigma_n**2 + 3*tau_n**2)
                                     bendingStressInWeld = sqrt(sigma_m**2 + 3*tau_m**2)
@@ -477,6 +496,7 @@ def selectEdgeByElem(load,prop):
     prop.AddOption("Envelope")
     prop.AddOption("High Edge Ids")
     prop.AddOption("Low Edge Ids")
+    prop.AddOption("Random Edge Id")
     
 def ClearResults(result, prop):
     ExtAPI.Log.WriteMessage("Clear Results...")
@@ -588,6 +608,29 @@ def addSlaves(result,prop):
     for x in ["FatigueCalculation","lc","lcFatigue","CraneGroup","addSlaves","EdgeByElem","EdgeOfModel"]:
         result.Properties.GetByName(x).ReadOnly = True
     result.Caption = result.Properties.GetByName("Identifier").Value + " " + result.Properties.GetByName("FatigueCalculation").Value # DOES NOT COMPUTE
+    
+def addMoreSlaves(result,prop): 
+    if result.Properties.GetByName("FatigueCalculation").Value == "No":
+        for wt in ["2xFW","2xPP","1xPP"]:
+            ResultObject = result.Analysis.CreateResultObject("Slave")
+            SProp = ResultObject.Properties
+            SProp.GetByName("Identifier").Value             = MProp.GetByName("Identifier").Value
+            SProp.GetByName("FatigueCalculation").Value     = MProp.GetByName("FatigueCalculation").Value 
+            if i == 1: # needs range(2)...
+                SProp.GetByName("Item").Value               = "Scaled Longitudinal over Equivalent (von-Mises) Stress"
+            SProp.GetByName("lc").Value                     = MProp.GetByName("lc").Value
+            SProp.GetByName("lcFatigue").Visible            = False
+            SProp.GetByName("CraneGroup").Visible           = False
+            SProp.GetByName("NotchCase").Value              = "Static"
+            SProp.GetByName("WeldType").Value               = wt
+            Caption = ""
+            Caption += SProp.GetByName("Identifier").Value + " "
+            Caption += SProp.GetByName("WeldType").Value + " "
+            Caption += SProp.GetByName("NotchCase").Value
+            if i == 1:
+                Caption += " Shear Factor"
+            ResultObject.Caption = Caption
+
 
 class cFatigueStresses:
     def __init__(self):
