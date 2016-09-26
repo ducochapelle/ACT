@@ -48,7 +48,7 @@ NotchCases = ["K0","K1","K2","K3"]
 weldThroats = range(5,25,1) + range(25,50,5) + range(50,100,10) + [100,120,150,200]
 
 def ExtAPILogWriteMessage(string):
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
+    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
     pass
 
 def ClearLog():
@@ -105,6 +105,7 @@ def createMaster(analysis):
     ResultObject.Properties.GetByName("Identifier").Value = n
     ResultObject.Properties.GetByName("lc").Value = str(LoadCases)
     ResultObject.Properties.GetByName("lcFatigue").Value = str(LoadCases)
+    ResultObject.Caption = "[{0}] Weld Master".format(n)
     global Data
     Data.pop(n, None) 
     pass
@@ -350,7 +351,7 @@ def createDB(result,step):
                             if weldType == "2xFW":
                                 sigma_n = tau_n = NormalForce * 1.414 / (4 * a)
                                 tau_l           = LongForce / (2 * a)
-                                b               = plateThickness + 0.67 * a * 1.414
+                                b               = plateThickness + 0.667 * a * 1.414
                                 sigma_m         = tau_m = Moment / (1.414 * a * b)
                             elif weldType == "2xPP":
                                 sigma_n         = NormalForce / (2 * a)
@@ -362,15 +363,15 @@ def createDB(result,step):
                             elif weldType == "1xPP":
                                 sigma_n         = NormalForce / a
                                 tau_l           = LongForce / a
-                                sigma_m         = Moment / (4**(-1) * a**2)
+                                sigma_m         = Moment / (0.250 * a**2)
                                 tau_n = tau_m   = 0
                             sigma_vm1   = sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
                             sigma_vm2   = sqrt((sigma_n - sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n - tau_m)**2)
                             sigma_vm    = max(sigma_vm1, sigma_vm2)
                             if sigma_vm < allowableStress: 
-                                axialStressInWeld   = sqrt(sigma_n**2 + 3*tau_n**2)
-                                bendingStressInWeld = sqrt(sigma_m**2 + 3*tau_m**2)
-                                longStressInWeld    = sqrt(             3*tau_l**2)
+                                axialStressInWeld   = sigma_n + tau_n   # similar to sqrt(sigma_n**2 + 3*tau_n**2) given that sigma == tau or 0 == tau
+                                bendingStressInWeld = sigma_m + tau_m   # similar to sqrt(sigma_m**2 + 3*tau_m**2) given that sigma == tau or 0 == tau
+                                longStressInWeld    = 1.732*tau_l       # similar to sqrt(             3*tau_l**2)
                                 DeepData = Data[Identifier][analysisName][resultSet][elemId][weldType][notchCase]
                                 DeepData["Throat Thickness"]                       = a
                                 DeepData["Scaled Axial Stress"]                    = axialStressInWeld  
@@ -403,7 +404,6 @@ def createDB(result,step):
         ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> CreateDB: Finished Fatigue Without Errors")
 
 def CalculateFatigue(Properties, DataId):
-    ExtAPILogWriteMessage("BITCHESSS")
     LoadCases = eval(Properties.GetByName("lcFatigue").Value)
     CraneGroup = Properties.GetByName("CraneGroup").Value
     for elemId in WeldElements:
@@ -418,12 +418,13 @@ def CalculateFatigue(Properties, DataId):
                 for resultSet in LoadCases[analysisName]:
                     DeepData = DataId[analysisName][resultSet][elemId]["None"]["Static"]
                     NormalForce = DeepData["Axial Force mm^-1"]
-                    LongForce   = DeepData["Longitudinal Moment mm^-1"]
-                    Moment      = DeepData["Longitudinal Force mm^-1"]
+                    LongForce   = DeepData["Longitudinal Force mm^-1"]
+                    Moment      = DeepData["Longitudinal Moment mm^-1"]
+                    ExtAPILogWriteMessage("Analysis: {0}, resultSet: {1}, WeldType: {2}, Normal: {3}, Long: {4}, Moment: {5}".format(analysisName, resultSet, weldType, NormalForce, LongForce, Moment))
                     if weldType == "2xFW":
                         sigma_n = tau_n = NormalForce * 1.414 / (4 * a)
                         tau_l           = LongForce / (2 * a)
-                        b               = plateThickness + 0.67 * a * 1.414
+                        b               = plateThickness + 0.667 * a * 1.414
                         sigma_m         = tau_m = Moment / (1.414 * a * b)
                     elif weldType == "2xPP":
                         sigma_n         = NormalForce / (2 * a)
@@ -435,11 +436,11 @@ def CalculateFatigue(Properties, DataId):
                     elif weldType == "1xPP":
                         sigma_n         = NormalForce / a
                         tau_l           = LongForce / a
-                        sigma_m         = Moment / (4**(-1) * a**2)
+                        sigma_m         = Moment / (0.250 * a**2)
                         tau_n = tau_m   = 0
-                    axialStressInWeld   = sqrt(sigma_n**2 + 3*tau_n**2)
-                    bendingStressInWeld = sqrt(sigma_m**2 + 3*tau_m**2)
-                    longStressInWeld    = sqrt(             3*tau_l**2)
+                    axialStressInWeld   = sigma_n + tau_n # similar to sqrt(sigma_n**2 + 3*tau_n**2) given that sigma == tau or 0 == tau
+                    bendingStressInWeld = sigma_m + tau_m # similar to sqrt(sigma_m**2 + 3*tau_m**2) given that sigma == tau or 0 == tau
+                    longStressInWeld    = 1.732*tau_l # similar to sqrt(             3*tau_l**2)
                     # get both (ax - m, ax + m, long), define K factor
                     WeldStressDirections.append({"ax1":axialStressInWeld - bendingStressInWeld, \
                                                  "ax2":axialStressInWeld + bendingStressInWeld, \
@@ -455,11 +456,15 @@ def CalculateFatigue(Properties, DataId):
                     DataId[analysisName][resultSet][elemId][weldType]["Static"]["K-factor"]=K 
                     for notchCase in NotchCases:
                         allowableStress = FatigueStresses.Get(CraneGroup,str(K),notchCase)
+                        DeepData = DataId[analysisName][resultSet][elemId]["None"]["Static"]
+                        NormalForce = DeepData["Axial Force mm^-1"]
+                        LongForce   = DeepData["Longitudinal Force mm^-1"]
+                        Moment      = DeepData["Longitudinal Moment mm^-1"]
                         for a in weldThroats:       
                             if weldType == "2xFW":
                                 sigma_n = tau_n = NormalForce * 1.414 / (4 * a)
                                 tau_l           = LongForce / (2 * a)
-                                b               = plateThickness + 0.67 * a * 1.414
+                                b               = plateThickness + 0.670 * a * 1.414
                                 sigma_m         = tau_m = Moment / (1.414 * a * b)
                             elif weldType == "2xPP":
                                 sigma_n         = NormalForce / (2 * a)
@@ -471,7 +476,7 @@ def CalculateFatigue(Properties, DataId):
                             elif weldType == "1xPP":
                                 sigma_n         = NormalForce / a
                                 tau_l           = LongForce / a
-                                sigma_m         = Moment / (4**(-1) * a**2)
+                                sigma_m         = Moment / (0.250 * a**2)
                                 tau_n = tau_m   = 0
                             sigma_vm1   = sqrt((sigma_n + sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n + tau_m)**2)
                             sigma_vm2   = sqrt((sigma_n - sigma_m)**2 + 3*(tau_l)**2 + 3*(tau_n - tau_m)**2)
@@ -501,15 +506,17 @@ def CalculateK(WeldStressDirections):
     -1.0
     >>> CalculateK([{"ax1":0.0,"ax2":0.0,"lng":0.0},{"ax1":0.0,"ax2":0.0,"lng":0.0}])
     1.0
+    >>> CalculateK([{'lng': 74.3234926291666, 'ax1': -109.87699064127602, 'ax2': 180.72234464518229}, {'lng': 16.771171839519191, 'ax1': -71.454549560546866, 'ax2': 218.79426879882811}])
+    0.5
     """
     # todo: check lcFatigue 
     # todo: en als het allmeaal nul is? even goed doordenken! EN dus niet gewoon alles 1 maken en ervanuitgaan dat dat dan wel goed zit
     ax1s = [d["ax1"] for d in WeldStressDirections]
     ax2s = [d["ax2"] for d in WeldStressDirections]
     lngs = [d["lng"] for d in WeldStressDirections]
-    maxAx1 = max(ax1s)
-    maxAx2 = max(ax2s)
-    maxLng = max(lngs)
+    maxAx1 = max([abs(x) for x in ax1s])
+    maxAx2 = max([abs(x) for x in ax2s])
+    maxLng = max([abs(x) for x in lngs])
     AxFactor1 = maxAx1/(maxAx1+maxLng) if maxAx1+maxLng != 0 else 1
     AxFactor2 = maxAx2/(maxAx2+maxLng) if maxAx2+maxLng != 0 else 1
     K_ax1 = maxabs_over_minabs(ax1s)
@@ -518,9 +525,10 @@ def CalculateK(WeldStressDirections):
     K_1 = K_ax1 * AxFactor1 + K_lng * (1 - AxFactor1)  
     K_2 = K_ax2 * AxFactor2 + K_lng * (1 - AxFactor2)  
     K = round(min(K_1, K_2),1)
+    K = 0.0 if K == -0.0 else K # ...
     # print str([str(x) for x in [K, ax1s, ax2s, lngs, maxAx1, maxAx2, maxLng, AxFactor1, AxFactor2, K_ax1, K_ax2, K_lng, K_1, K_2]])
     return K
-
+    
 def maxabs_over_minabs(x):
     """ Returns the fraction of the absolutely smallest over largest value.
     
@@ -545,24 +553,25 @@ def maxabs_over_minabs(x):
     
 def getValue(result,elemId):
     ExtAPILogWriteMessage("getValue: elemId:{3} Step:, Start Slave Id: {1}, Item: {2}".format(  str(datetime.now()                                  ), \
-                                                                                                str(result.Properties.GetByName("Identifier").Value ), \
+                                                                                                str(Properties.GetByName("Identifier").Value ), \
                                                                                                 str(result.Caption                                  ), \
                                                                                                 str(elemId)                                         )  )
 
     global WeldElements
     if elemId not in WeldElements:
         return []
-    Identifier = result.Properties.GetByName("Identifier").Value
+    Properties      = result.Properties
+    Identifier      = Properties.GetByName("Identifier").Value
+    Type            = Properties.GetByName("FatigueCalculation").Value
+    Item            = Properties.GetByName("Item").Value
+    WeldType        = Properties.GetByName("WeldType").Value
+    NotchCase       = Properties.GetByName("NotchCase").Value
+    StaticLoadCases = eval(Properties.GetByName("lc").Value)
+    CraneGroup      = Properties.GetByName("CraneGroup").Value
+    FatigueLoadCases = eval(Properties.GetByName("lcFatigue").Value)
     global Data
     if not Identifier in Data:
         return []
-    Type            = result.Properties.GetByName("FatigueCalculation").Value
-    Item            = result.Properties.GetByName("Item").Value
-    WeldType        = result.Properties.GetByName("WeldType").Value
-    NotchCase       = result.Properties.GetByName("NotchCase").Value
-    StaticLoadCases = eval(result.Properties.GetByName("lc").Value)
-    CraneGroup      = result.Properties.GetByName("CraneGroup").Value
-    FatigueLoadCases = eval(result.Properties.GetByName("lcFatigue").Value)
 
     # Ok dit is een ingewikkeld stuk...
     ExtAPILogWriteMessage("getValue: elemId:{0} Mid".format(str(elemId)))
@@ -950,7 +959,6 @@ class cFatigueStresses:
 FatigueStresses = cFatigueStresses()
 
 def unittest():
-    # mabs
     # getNormalDirection
     # Tensor
     # CalculateFatigue
@@ -961,11 +969,22 @@ def destroyDB(result,step):
     # if not result.Analysis.ResultsData.ResultSetCount == step:
         # return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, End Master Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
+
+
     
 def startSlave(result,step):
     # if not result.Analysis.ResultsData.ResultSetCount == step:
         # return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, Start Slave Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
+    Properties      = result.Properties
+    Identifier      = Properties.GetByName("Identifier").Value
+    Type            = Properties.GetByName("FatigueCalculation").Value
+    Item            = Properties.GetByName("Item").Value
+    WeldType        = Properties.GetByName("WeldType").Value
+    NotchCase       = Properties.GetByName("NotchCase").Value
+    StaticLoadCases = eval(Properties.GetByName("lc").Value)
+    CraneGroup      = Properties.GetByName("CraneGroup").Value
+    FatigueLoadCases = eval(Properties.GetByName("lcFatigue").Value)
 
 def endSlave(result,step):
     # if not result.Analysis.ResultsData.ResultSetCount == step:
