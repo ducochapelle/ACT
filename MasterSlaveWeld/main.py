@@ -3,7 +3,7 @@ global Identifier
 Identifier = {}
 
 def ExtAPILogWriteMessage(string):
-    ExtAPI.Log.WriteMessage(string)
+    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+string)
     pass
 
 def clearLog():
@@ -23,28 +23,36 @@ def clearLog():
 def createLoad(analysis):
     ExtAPILogWriteMessage("createLoad...")
     analysis.CreateResultObject("MultiWeldscale")
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "2xFW"
+    analysis.CreateResultObject("MultiWeldscale")
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "2xPP"
+    analysis.CreateResultObject("MultiWeldscale")
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "1xPP"
+    analysis.CreateResultObject("MultiWeldscale")
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "2xFW"
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("Display").Value = "Scaled Longitudinal over Equivalent (von-Mises) Stress"
 
 def doClearLog(analysis):
     clearLog()
     
 def getNormalDirection(edge,face):
     # returns the unitvector perpendicular to the edge and in the plane of the face
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> start getNormalDirection ")
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> plateNormal ")
+    ExtAPILogWriteMessage("start getNormalDirection ")
+    ExtAPILogWriteMessage("plateNormal ")
     plateNormal = (face.Normals[0], \
                    face.Normals[1], \
                    face.Normals[2])
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> edgeVector ")
+    ExtAPILogWriteMessage("edgeVector ")
     edgeVector = (edge.StartVertex.X - edge.EndVertex.X,
                   edge.StartVertex.Y - edge.EndVertex.Y,
                   edge.StartVertex.Z - edge.EndVertex.Z)
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> edgeVectorLength ")
+    ExtAPILogWriteMessage("edgeVectorLength ")
     edgeVectorLength = ( edgeVector[0]**2+edgeVector[1]**2+edgeVector[2]**2 ) ** ( 0.5 )
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> edgeUnits ")
+    ExtAPILogWriteMessage("edgeUnits ")
     edgeUnit = (edgeVector[0]/edgeVectorLength,
                 edgeVector[1]/edgeVectorLength,
                 edgeVector[2]/edgeVectorLength)
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> Norm ")
+    ExtAPILogWriteMessage("Norm ")
     Norm = (plateNormal[1] * edgeUnit[2] - plateNormal[2] * edgeUnit[1],
             plateNormal[2] * edgeUnit[0] - plateNormal[0] * edgeUnit[2],
             plateNormal[0] * edgeUnit[1] - plateNormal[1] * edgeUnit[0])
@@ -66,7 +74,7 @@ def getNormalDirection(edge,face):
             # plateNormal[0] * edgeUnit[1] - plateNormal[1] * edgeUnit[0])
             
     # return {"Normal":Norm, "Long":edgeUnit, "Cross":plateNormal}      # tested for performance, dict vs tuple, didnt matter. tuple vs array doesnt matter either.
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> return getNormalDirection ")
+    ExtAPILogWriteMessage("return getNormalDirection ")
     return (Norm,edgeUnit,plateNormal)
     
 def inProduct(F,u):
@@ -75,23 +83,26 @@ def inProduct(F,u):
     return A
 
 def getValue(result,SelemId):
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> START: GetValue of "+str(SelemId))
+    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+"START: GetValue of "+str(SelemId))
     
-    ExtAPILogWriteMessage(str(datetime.now())+" >>> Test existence of CreatedReverseLookupDictionairy ")
+    ExtAPILogWriteMessage("Test existence of CreatedReverseLookupDictionairy ")
     try:
         if CreatedReverseLookupDictionairy == 1:
-            ExtAPILogWriteMessage(str(datetime.now())+" >>> Allready Created Reverse Lookup Dictionairy")
+            ExtAPILogWriteMessage("Allready Created Reverse Lookup Dictionairy")
             pass
     except:
-        ExtAPILogWriteMessage(str(datetime.now())+" >>> Create Reverse Lookup Dictionairy ")
+        # push this whole except in a seperate button on the toolbar?
+        ExtAPILogWriteMessage("Create Reverse Lookup Dictionairy ")
         global CreatedReverseLookupDictionairy
         CreatedReverseLookupDictionairy = 1
         
-        
+        global AnalysisNames
         global FaceByElemId                                                                                 
         global EdgesByElemId 
+        global WeldElements
         
         NodesOnLines = set([])                                                                              
+        WeldElements = []
         FaceByElemId = {}                                                                                   
         EdgesByElemId = {}
         for elem in result.Analysis.MeshData.ElementIds:                                                    
@@ -115,38 +126,49 @@ def getValue(result,SelemId):
                                         EdgesByElemId[ConnectedElementId].append(edge)
                         for ElementId in result.Analysis.MeshData.MeshRegionById(face.Id).ElementIds:
                             FaceByElemId[ElementId] = face
-        ExtAPILogWriteMessage(str(datetime.now())+" >>> Created Reverse Lookup Dictionairy ") 
-        ExtAPILogWriteMessage(str(datetime.now())+str(ExtAPI.DataModel.AnalysisNames))
+        ExtAPILogWriteMessage("Created Reverse Lookup Dictionairy ") 
+        # ExtAPILogWriteMessage(str(ExtAPI.DataModel.AnalysisNames))
 
-        for analysisName in ExtAPI.DataModel.AnalysisNames:
+        for elem in result.Analysis.MeshData.ElementIds:                                                    
+            if not EdgesByElemId[elem].Count == 0:
+                if int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
+                    WeldElements.append(elem)
+
+        AnalysisNames = ExtAPI.DataModel.AnalysisNames
+        ExtAPILogWriteMessage(str(AnalysisNames))
+        
+        for analysisName in AnalysisNames:
             Identifier[analysisName] = {}
         
-        for analysisName in ExtAPI.DataModel.AnalysisNames:
+        for analysisName in AnalysisNames:
             # Retrieve the stresses of the elements
             #maybe ask stress of the nodes who are actual on the line?? I think the element Ids can be easily queried...
             
-            ExtAPILogWriteMessage(str(datetime.now())+" >>> analysis "+str(analysisName))
-            ExtAPILogWriteMessage(str(datetime.now())+" >>> Get raw stresses")
+            ExtAPILogWriteMessage("analysis "+str(analysisName))
+            ExtAPILogWriteMessage("Get raw stresses")
             resultStress = ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.Result("S")
             for elemId in result.Analysis.MeshData.ElementIds:
                 
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> ELEM: "+str(elemId)) 
+                ExtAPILogWriteMessage("ELEM: "+str(elemId)) 
                 vals = []
-                
-                if EdgesByElemId[elemId].Count == 0:
-                    ExtAPILogWriteMessage(str(datetime.now())+" >>> RETURN: "+str(elemId)+" Element is not a weld") 
-                    continue
+                Identifier[analysisName][elemId]={"2xFW":{}, "2xPP":{}, "1xFW":{}, "1xPP":{}}
 
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Get platethickness")
+                if elemId not in WeldElements:
+                    ExtAPILogWriteMessage("CONTINUE: elemId not in WeldElements")
+                    continue
+                # if EdgesByElemId[elemId].Count == 0:
+                    # ExtAPILogWriteMessage("CONTINUE: "+str(elemId)+" Element is not a weld") 
+                    # continue
+                # if not int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
+                    # ExtAPILogWriteMessage("CONTINUE: Element is not a shell") 
+                    # continue
+
                 plateThickness = FaceByElemId[elemId].Body.Thickness * 1000   # to mm, this is so ugly
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> "+str(plateThickness))
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Get Allowablestress")
                 allowableStress = int(result.Properties.GetByName("sa").Value)
 
                 sxTotal = [abs(x) for x in resultStress.ElementValue(elemId,"X")]
                 syTotal = [abs(x) for x in resultStress.ElementValue(elemId,"Y")]
                 szTotal = [abs(x) for x in resultStress.ElementValue(elemId,"Z")]
-                ExtAPILogWriteMessage(str(datetime.now())+" "+str((sxTotal, syTotal, szTotal)))
                 sx = sum(sxTotal,0.0)/12  
                 sy = sum(syTotal,0.0)/12  
                 sz = sum(szTotal,0.0)/12  
@@ -162,57 +184,45 @@ def getValue(result,SelemId):
                 sxy = sum([abs(x) for x in resultStress.ElementValue(elemId,"XY")],0.0)/12 
                 syz = sum([abs(x) for x in resultStress.ElementValue(elemId,"YZ")],0.0)/12 
                 sxz = sum([abs(x) for x in resultStress.ElementValue(elemId,"XZ")],0.0)/12 
-                ExtAPILogWriteMessage(str(datetime.now())+" "+str((sxy, syz, sxz)))
-
                 
                 # Determine the edge to calculate with; for elements can be with multiple edges
                 # Contains duplicate calculations to be sure the worst-case edge is taken into account
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> start the whole extra edges misery")
                 if result.Properties.GetByName("EdgeByElem").Value == "Envelope":
                     weldThickness = 0
-                    ExtAPILogWriteMessage(str(datetime.now())+" >>> Edges: "+str([x.Id for x in EdgesByElemId[elemId]]))
                     for edge in EdgesByElemId[elemId]:
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> Run the edgeId tester with edge "+str(edge.Id))
                         units = getNormalDirection(edge, FaceByElemId[elemId]) 
                         NormalStress = inProduct([sx,sy,sz],units[0])
                         # CrossStress =  inProduct([sx,sy,sz],units[2])     # HIERVOOR moet je SZY zien te vinden!!!
                         LongStress =  inProduct([sxy,syz,sxz],units[1]) 
                         newWeldThickness = ( ( NormalStress**2+3*LongStress**2 )**(0.5) * plateThickness ) / (allowableStress)
                         if newWeldThickness >= weldThickness:
-                            EdgeIdWithMaxWeldThickness = edge.Id
+                            EdgeWithMaxWeldThickness = edge
                             weldThickness = newWeldThickness
-                    EdgeId = EdgeIdWithMaxWeldThickness
-                    ExtAPILogWriteMessage(str(datetime.now())+" >>> Ran the edgeId tester witht the winner edge: "+str(EdgeId))
+                    Edge = EdgeWithMaxWeldThickness
                 elif result.Properties.GetByName("EdgeByElem").Value == "High Edge Ids":
-                    EdgeId = max([x.Id for x in EdgesByElemId[elemId]])
+                    Edge = max([x.Id for x in EdgesByElemId[elemId]])
                 elif result.Properties.GetByName("EdgeByElem").Value == "Low Edge Ids":
-                    EdgeId = min([x.Id for x in EdgesByElemId[elemId]])
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> end the whole extra edges misery")
+                    Edge = min([x.Id for x in EdgesByElemId[elemId]])
                 # Calculate the actual weld
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> create dummy var")
-                aap = edge
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate units")
-                units = getNormalDirection(aap, FaceByElemId[elemId]) 
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate normal stress")
+                units = getNormalDirection(Edge, FaceByElemId[elemId]) 
                 NormalStress = inProduct([sxMid,syMid,szMid],units[0])
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate long stress")
                 LongStress =  inProduct([sxy,syz,sxz],units[0])  # was units[0] .... hm... does that hurt?
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> "+str((NormalStress,LongStress)))
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate equi stress")
                 EquivalentStress = ( NormalStress**2+3*LongStress**2 )**(0.5) 
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> "+str(EquivalentStress))
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate weld thickness raw stress")
                 weldThickness = ( EquivalentStress * plateThickness ) / (allowableStress)
-             
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate normal and long force")
+                Identifier[analysisName][elemId]["Equivalent (von-Mises) Stress"]           = abs(EquivalentStress)
+                Identifier[analysisName][elemId]["Axial Stress"]                            = abs(NormalStress)
+                Identifier[analysisName][elemId]["Longitudinal Stress"]                     = abs(LongStress)
+                Identifier[analysisName][elemId]["Throat Thickness according to LasE2.mac"] = weldThickness
+                
                 NormalForce = NormalStress * plateThickness
                 LongForce = LongStress * plateThickness
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate moment")
                 Moment = (inProduct([sxTop,syTop,szTop],units[0]) - NormalStress) * plateThickness**2 * 6**(-1) 
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> "+str((NormalForce, LongForce, Moment)))
-
+                Identifier[analysisName][elemId]["Axial Force mm^-1"]           = abs(NormalForce)
+                Identifier[analysisName][elemId]["Longitudinal Moment mm^-1"]   = abs(Moment)
+                Identifier[analysisName][elemId]["Longitudinal Force mm^-1"]    = abs(LongForce)
+                
                 # Get unit vectors for debuggin purpose
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Set normal units")
+                ExtAPILogWriteMessage("Set normal units")
                 unitNormalScalar = round(abs(9*units[0][0]))*100 \
                                  + round(abs(9*units[0][1]))*10 \
                                  + round(abs(9*units[0][2]))
@@ -222,148 +232,138 @@ def getValue(result,SelemId):
                 unitLongScalar   = round(abs(9*units[1][0]))*100 \
                                  + round(abs(9*units[1][1]))*10 \
                                  + round(abs(9*units[1][2]))
+                Identifier[analysisName][elemId]["Axial Unit Vector"]           = unitNormalScalar
+                Identifier[analysisName][elemId]["Cross Unit Vector"]           = unitCrossScalar
+                Identifier[analysisName][elemId]["Longitudinal Unit Vector"]    = unitLongScalar
                 
+                #Iterate towards the minimum throat thickness with Moment uit Las Spanningen, Staal Profielen
+            
+                a = 5.0
+                for iii in range(195):
+                    sigma1 = NormalForce * 1.414 / (4 * a)
+                    tau1 = LongForce / (2 * a)
+                    b = plateThickness + 0.67 * a * 1.414
+                    sigma2 = Moment / (1.414 * a * b)
+                    sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)
+                    if sigma_vm < allowableStress:
+                        if abs(sigma_vm) > 1:
+                            bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
+                            longStressOverVonMisses = abs(1.732*tau1) / abs(sigma_vm)  #divide by zero
+                        else:
+                            bendingStressOverVonMisses = 0
+                            longStressOverVonMisses = 0
+                        break
+                    a += 1
+                Identifier[analysisName][elemId]["2xFW"]["Throat Thickness"]                                  = a
+                Identifier[analysisName][elemId]["2xFW"]["Scaled Bending over Equivalent (von-Mises) Stress"] = bendingStressOverVonMisses
+                Identifier[analysisName][elemId]["2xFW"]["Scaled Longitudinal over Equivalent (von-Mises) Stress"] = longStressOverVonMisses
+                Identifier[analysisName][elemId]["2xFW"]["Scaled Equivalent (von-Mises) Stress"]              = abs(sigma_vm)
+                Identifier[analysisName][elemId]["2xFW"]["Scaled Axial Stress"]                               = abs(sigma1)
+                Identifier[analysisName][elemId]["2xFW"]["Scaled Bending Stress"]                             = abs(sigma2)
+                Identifier[analysisName][elemId]["2xFW"]["Scaled Longitudinal Stress"]                        = abs(tau1)
                 
-                #Iterate towards the minimum throat thickness with Moment
-                if result.Properties.GetByName("WeldType").Value == "2xFW":
-                    ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculate 2xFW")
-                    a = 5.0
-                    ExtAPILogWriteMessage(str(datetime.now())+" >>> 01 02 03")
-                    for iii in range(200):
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 01")
-                        sigma1 = NormalForce * 1.414 / (4 * a)                                                    # uit Las Spanningen, Staal Profielen
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 02")
-                        tau1 = LongForce / (2 * a)                                                                     # uit Las Spanningen, Staal Profielen
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 03")
-                        b = plateThickness + 0.67 * a * 1.414                                                   # uit Las Spanningen, Staal Profielen
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 04")
-                        sigma2 = Moment / (1.414 * a * b)                                                      # uit Las Spanningen, Staal Profielen
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 05")
-                        sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)                                     # uit Las Spanningen, Staal Profielen
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 06")
-                        if sigma_vm < allowableStress:
-                            ExtAPILogWriteMessage(str(datetime.now())+" >>> 07")
-                            # bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
-                            ExtAPILogWriteMessage(str(datetime.now())+" >>> 08")
-                            weldThicknessWithMoment = a
-                            ExtAPILogWriteMessage(str(datetime.now())+" >>> 09")
-                            break
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 10")
-                        a += 1
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 11")
-                    else:
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 12")
-                        weldThicknessWithMoment = 200.0
-                        ExtAPILogWriteMessage(str(datetime.now())+" >>> 13")
-                    ExtAPILogWriteMessage(str(datetime.now())+" >>> Calculated 2xFW")
-                elif result.Properties.GetByName("WeldType").Value == "2xPP":
-                    a = 5.0
-                    for iii in range(200):
-                        sigma1 = NormalForce / (2 * a)                                                    
-                        tau1 = LongForce / (2 * (a / 1.414))                                                                    
-                        b = plateThickness - 0.67 * a                                               
-                        sigma2 = Moment / (a * b)                                                   
-                        sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)                                
-                        if sigma_vm < allowableStress:
-                            # bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
-                            weldThicknessWithMoment = a
-                            break
-                        a += 1
-                    else:
-                        weldThicknessWithMoment = 200.0
-                elif result.Properties.GetByName("WeldType").Value == "1xFW":
-                    a = 5.0
-                    for iii in range(200):
-                        sigma1 = NormalForce * 1.414 / (2 * a)                                                    # uit Las Spanningen, Staal Profielen
-                        tau1 = LongForce / a                                                                     # uit Las Spanningen, Staal Profielen
-                        sigma2 = Moment / (6**(-1) * (1.414 * a)**2)                                                      # uit Las Spanningen, Staal Profielen
-                        sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)                                     # uit Las Spanningen, Staal Profielen
-                        if sigma_vm < allowableStress:
-                            # bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
-                            weldThicknessWithMoment = a
-                            break
-                        a += 1
-                    else:
-                        weldThicknessWithMoment = 200.0
-                elif result.Properties.GetByName("WeldType").Value == "1xPP":
-                    a = 5.0
-                    for iii in range(200):
-                        sigma1 = NormalForce / a                                                    
-                        tau1 = LongForce / (a / 1.414)                                                                    
-                        sigma2 = Moment / (6**(-1) * a**2)                                                   
-                        sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)                                
-                        if sigma_vm < allowableStress:
-                            # bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
-                            weldThicknessWithMoment = a
-                            break
-                        a += 1
-                    else:
-                        weldThicknessWithMoment = 200.0
-                            
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Create vals")
-                # Output                   
-                if result.Properties.GetByName("Display").Value == "Throat Thickness":
-                    vals.Add(abs(weldThicknessWithMoment))
-                elif result.Properties.GetByName("Display").Value == "Throat Thickness according to LasE2.mac":
-                    vals.Add(weldThickness)   
-                elif result.Properties.GetByName("Display").Value == "Scaled Bending over Equivalent (von-Mises) Stress":
-                    vals.Add(bendingStressOverVonMisses)   
-                elif result.Properties.GetByName("Display").Value == "Scaled Equivalent (von-Mises) Stress":
-                    vals.Add(abs(sigma_vm))
-                elif result.Properties.GetByName("Display").Value == "Scaled Axial Stress":
-                    vals.Add(abs(sigma1))
-                elif result.Properties.GetByName("Display").Value == "Scaled Bending Stress":
-                    vals.Add(abs(sigma2))
-                elif result.Properties.GetByName("Display").Value == "Scaled Longitudinal Stress":
-                    vals.Add(abs(tau1))
-                elif result.Properties.GetByName("Display").Value == "Axial Force mm^-1":
-                    vals.Add(abs(NormalForce))
-                elif result.Properties.GetByName("Display").Value == "Longitudinal Moment mm^-1":
-                    vals.Add(abs(Moment))
-                elif result.Properties.GetByName("Display").Value == "Longitudinal Force mm^-1":
-                    vals.Add(abs(LongForce))
-                elif result.Properties.GetByName("Display").Value == "Equivalent (von-Mises) Stress":
-                    vals.Add(abs(EquivalentStress))
-                elif result.Properties.GetByName("Display").Value == "Axial Stress":
-                    vals.Add(abs(NormalStress))
-                elif result.Properties.GetByName("Display").Value == "Longitudinal Stress":
-                    vals.Add(abs(LongStress))
-                elif result.Properties.GetByName("Display").Value == "Axial Unit Vector":
-                    vals.Add(unitNormalScalar)
-                elif result.Properties.GetByName("Display").Value == "Cross Unit Vector":
-                    vals.Add(unitCrossScalar)
-                elif result.Properties.GetByName("Display").Value == "Longitudinal Unit Vector":
-                    vals.Add(unitLongScalar)
-                    
-                # ---- Identifier Slave
-                # Make identifier name a combination of Environment name and weld type by default
-                # Make option in xml to add 3 at once.
-                ExtAPILogWriteMessage(str(datetime.now())+" >>> Identifier Slave")
-                Identifier[analysisName][elemId]=vals
-                # ---- Identifier Slave />
-    if not int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
-        ExtAPILogWriteMessage(str(datetime.now())+" >>> RETURN: Element is not a shell") 
-        return []
+                a = 5.0
+                for iii in range(195):
+                    sigma1 = NormalForce / (2 * a)
+                    tau1 = LongForce / (2 * (a / 1.414))
+                    b = plateThickness - 0.67 * a
+                    sigma2 = Moment / (a * b)
+                    sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)
+                    if sigma_vm < allowableStress:
+                        if abs(sigma_vm) > 1:
+                            bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
+                            longStressOverVonMisses = abs(1.732*tau1) / abs(sigma_vm)  #divide by zero
+                        else:
+                            bendingStressOverVonMisses = 0
+                            longStressOverVonMisses = 0
+                        break
+                    a += 1
+                Identifier[analysisName][elemId]["2xPP"]["Throat Thickness"]                                  = a
+                Identifier[analysisName][elemId]["2xPP"]["Scaled Bending over Equivalent (von-Mises) Stress"] = bendingStressOverVonMisses
+                Identifier[analysisName][elemId]["2xPP"]["Scaled Longitudinal over Equivalent (von-Mises) Stress"] = longStressOverVonMisses
+                Identifier[analysisName][elemId]["2xPP"]["Scaled Equivalent (von-Mises) Stress"]              = abs(sigma_vm)
+                Identifier[analysisName][elemId]["2xPP"]["Scaled Axial Stress"]                               = abs(sigma1)
+                Identifier[analysisName][elemId]["2xPP"]["Scaled Bending Stress"]                             = abs(sigma2)
+                Identifier[analysisName][elemId]["2xPP"]["Scaled Longitudinal Stress"]                        = abs(tau1)
+                                                                                                                
+                a = 5.0                                                                                         
+                for iii in range(195):                                                                          
+                    sigma1 = NormalForce * 1.414 / (2 * a)                                                      
+                    tau1 = LongForce / a                                                                        
+                    sigma2 = Moment / (6**(-1) * (1.414 * a)**2)                                                
+                    sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)                                    
+                    if sigma_vm < allowableStress:                                                              
+                        if abs(sigma_vm) > 1:
+                            bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
+                            longStressOverVonMisses = abs(1.732*tau1) / abs(sigma_vm)  #divide by zero
+                        else:
+                            bendingStressOverVonMisses = 0
+                            longStressOverVonMisses = 0
+                        break
+                    a += 1                                                                                      
+                Identifier[analysisName][elemId]["1xFW"]["Throat Thickness"]                                  = a
+                Identifier[analysisName][elemId]["1xFW"]["Scaled Bending over Equivalent (von-Mises) Stress"] = bendingStressOverVonMisses
+                Identifier[analysisName][elemId]["1xFW"]["Scaled Longitudinal over Equivalent (von-Mises) Stress"] = longStressOverVonMisses
+                Identifier[analysisName][elemId]["1xFW"]["Scaled Equivalent (von-Mises) Stress"]              = abs(sigma_vm)
+                Identifier[analysisName][elemId]["1xFW"]["Scaled Axial Stress"]                               = abs(sigma1)
+                Identifier[analysisName][elemId]["1xFW"]["Scaled Bending Stress"]                             = abs(sigma2)
+                Identifier[analysisName][elemId]["1xFW"]["Scaled Longitudinal Stress"]                        = abs(tau1)
+                                                                                                                
+                a = 5.0                                                                                         
+                for iii in range(195):                                                                          
+                    sigma1 = NormalForce / a                                                                    
+                    tau1 = LongForce / (a / 1.414)                                                              
+                    sigma2 = Moment / (6**(-1) * a**2)                                                          
+                    sigma_vm = ( (sigma1 + sigma2)**2 + 3 * tau1**2 )**(0.5)                                    
+                    if sigma_vm < allowableStress:                                                              
+                        if abs(sigma_vm) > 1:
+                            bendingStressOverVonMisses = abs(sigma2) / abs(sigma_vm)  #divide by zero
+                            longStressOverVonMisses = abs(1.732*tau1) / abs(sigma_vm)  #divide by zero
+                        else:
+                            bendingStressOverVonMisses = 0
+                            longStressOverVonMisses = 0
+                        break
+                    a += 1                                                                                      
+                Identifier[analysisName][elemId]["1xPP"]["Throat Thickness"]                                  = a
+                Identifier[analysisName][elemId]["1xPP"]["Scaled Bending over Equivalent (von-Mises) Stress"] = bendingStressOverVonMisses
+                Identifier[analysisName][elemId]["1xPP"]["Scaled Longitudinal over Equivalent (von-Mises) Stress"] = longStressOverVonMisses
+                Identifier[analysisName][elemId]["1xPP"]["Scaled Equivalent (von-Mises) Stress"]              = abs(sigma_vm)
+                Identifier[analysisName][elemId]["1xPP"]["Scaled Axial Stress"]                               = abs(sigma1)
+                Identifier[analysisName][elemId]["1xPP"]["Scaled Bending Stress"]                             = abs(sigma2)
+                Identifier[analysisName][elemId]["1xPP"]["Scaled Longitudinal Stress"]                        = abs(tau1)
 
-    if EdgesByElemId[SelemId].Count == 0:
-        ExtAPILogWriteMessage(str(datetime.now())+" >>> RETURN: Element is not a weld") 
+                
+    if SelemId not in WeldElements:
+        ExtAPILogWriteMessage("CONTINUE: elemId not in WeldElements")
         return []
+    # if not int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
+        # ExtAPILogWriteMessage("RETURN: Element is not a shell") 
+        # return []
+    # if EdgesByElemId[SelemId].Count == 0:
+        # ExtAPILogWriteMessage("RETURN: Element is not a weld") 
+        # return []
 
-    #---- Identifier Master
-    maxValue = 0
-    for analysisName in ExtAPI.DataModel.AnalysisNames:        
-        maxValue = max(maxValue, Identifier[analysisName][SelemId])
-    # ExtAPI.Log.WriteMessage("Maxvalue = "+str(maxValue)+"...")
-    return maxValue
-    #---- Identifier Master />            
+    Display = result.Properties.GetByName("Display").Value
+    WeldType = result.Properties.GetByName("WeldType").Value
+    
+    if Display in ("Throat Thickness","Scaled Longitudinal over Equivalent (von-Mises) Stress", "Scaled Bending over Equivalent (von-Mises) Stress", "Scaled Equivalent (von-Mises) Stress", "Scaled Axial Stress", "Scaled Bending Stress", "Scaled Longitudinal Stress"):
+    # if Display in ("Throat Thickness", \
+                  # "Scaled Bending over Equivalent (von-Mises) Stress", \
+                  # "Scaled Equivalent (von-Mises) Stress", \             
+                  # "Scaled Axial Stress", \                              
+                  # "Scaled Bending Stress", \                            
+                  # "Scaled Longitudinal Stress"):
+        return [max([Identifier[analysisName][SelemId][WeldType][Display] for analysisName in AnalysisNames])]
+    else:
+        return [max([Identifier[analysisName][SelemId][Display] for analysisName in AnalysisNames])]
     
 def selectDisplay(load,prop):
     prop.ClearOptions()
     prop.AddOption("Throat Thickness")
-    prop.AddOption("Throat Thickness according to LasE2.mac")
     prop.AddOption(" ")
-    prop.AddOption("Scaled Bending over Equivalent (von-Mises) Stress")
     prop.AddOption("Scaled Equivalent (von-Mises) Stress")
+    prop.AddOption("Scaled Bending over Equivalent (von-Mises) Stress")
+    prop.AddOption("Scaled Longitudinal over Equivalent (von-Mises) Stress")
     prop.AddOption("Scaled Axial Stress")
     prop.AddOption("Scaled Bending Stress")
     prop.AddOption("Scaled Longitudinal Stress")
@@ -376,7 +376,8 @@ def selectDisplay(load,prop):
     prop.AddOption("Axial Unit Vector")
     prop.AddOption("Cross Unit Vector")
     prop.AddOption("Longitudinal Unit Vector")
-    prop.AddOption("Envelope")
+    prop.AddOption("Throat Thickness according to LasE2.mac")
+    
 
 def selectEdgeByElem(load,prop):
     prop.ClearOptions()
