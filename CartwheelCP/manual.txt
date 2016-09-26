@@ -1,0 +1,3 @@
+turn off weak springs
+don't apply any loads or constrain on the edge or centernode. Contacts or springs are allowed.
+if icons are wrong, stuff is wrong
