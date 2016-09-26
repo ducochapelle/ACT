@@ -3,22 +3,22 @@
 
 # T O D O
 
-# 0 Fatigue K factor klopt niet
+# 0 Fatigue K factor klopt niet?
 # 0.5 make Identifier true int instead of semi string
 
 # BUG: when inserted in an environmen with multiple load cases it will run multiple times. Fuck it.
-# ? Use time to display different results (like weld type or notch case)
+# ? Use time to display different results instead of multiple result probes (like weld type or notch case)
 
 # 1  Add 'beta' option, a factor on FW.
 # 1.3 enable unselecting elements between analysises. -- zie MultiWeldScaleScope
-# 1.5 D O E S  N O T  W O R K  I N DesignAssessment
+# 1.5 bug: D O E S  N O T  W O R K  I N DesignAssessment
 # 1.5 Onendeval data van mesh en tijd en load cases bij houden
 # 1.8 clear results moet eigenlijk ook zijn slaves clearen.
 
 # 2 New mesh, new calc, --> wrong database? 
 # -> <solver> element?
 # -> check d
-# 2 Sometimes loadsteps are generated which are not there
+# 2 bug: Sometimes loadsteps are generated which are not there; probably old tabular data?
 # 2 move often used strings to global object for maintainability
 
 # 3 Check if loadcase exists
@@ -26,6 +26,7 @@
 # 3 When subset, allow option to enable "red" edges instead of "yellow, purple and black" ones to contain welds
 # 3 possible huge time gain by using ElementValues instead of ElementValue
 # 3 import cProfile of profiler, eerst downloaden. Zodat je de echte versie hebt en fatsoenlijk kan profilen.
+# 3 fix bug where all the readonly's are on their default value when just inserted; maybe do keypress up and down?
 
 # 4 OOIT automatisch shear factor weld herverdelen
 
@@ -170,6 +171,7 @@ class Tensor():
         return M
 
 def createDB(result,step):
+    # delete Data? dit staat nu in onevaluate dus volgens mij kan dat. <-----------------------------------------------
     # if not result.Analysis.ResultsData.ResultSetCount == step:
         # return
     ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> CreateDB: Reverse Dictionaries")
@@ -552,29 +554,23 @@ def maxabs_over_minabs(x):
     return min(x)/max(x) if abs(min(x)) < max(x) and max(x) != 0 else max(x)/min(x) if min(x) != 0 else 1
     
 def getValue(result,elemId):
-    ExtAPILogWriteMessage("getValue: elemId:{3} Step:, Start Slave Id: {1}, Item: {2}".format(  str(datetime.now()                                  ), \
-                                                                                                str(Properties.GetByName("Identifier").Value ), \
-                                                                                                str(result.Caption                                  ), \
-                                                                                                str(elemId)                                         )  )
-
     global WeldElements
     if elemId not in WeldElements:
         return []
-    Properties      = result.Properties
-    Identifier      = Properties.GetByName("Identifier").Value
-    Type            = Properties.GetByName("FatigueCalculation").Value
-    Item            = Properties.GetByName("Item").Value
-    WeldType        = Properties.GetByName("WeldType").Value
-    NotchCase       = Properties.GetByName("NotchCase").Value
-    StaticLoadCases = eval(Properties.GetByName("lc").Value)
-    CraneGroup      = Properties.GetByName("CraneGroup").Value
-    FatigueLoadCases = eval(Properties.GetByName("lcFatigue").Value)
+    global sp # door die class maar 1 keer aan te maken ipv voor elk element die properties te vragen.. 120 sec -> 80 sec per slave
+    Identifier      = sp.Identifier      
+    Type            = sp.Type            
+    Item            = sp.Item            
+    WeldType        = sp.WeldType        
+    NotchCase       = sp.NotchCase       
+    StaticLoadCases = sp.StaticLoadCases 
+    CraneGroup      = sp.CraneGroup      
+    FatigueLoadCases= sp.FatigueLoadCases
     global Data
     if not Identifier in Data:
         return []
 
-    # Ok dit is een ingewikkeld stuk...
-    ExtAPILogWriteMessage("getValue: elemId:{0} Mid".format(str(elemId)))
+    # Ok dit is een ingewikkeld stuk... maar het kost echt nul computation time... superraar.
     vals = []
     sals = []
     if Item == "Scaled Longitudinal over Equivalent (von-Mises) Stress":
@@ -583,8 +579,7 @@ def getValue(result,elemId):
                 Deep = Data[Identifier][analysisName][resultSet][elemId][WeldType][NotchCase]
                 vals.append( Deep["Throat Thickness"])                      # regular a
                 sals.append((Deep["Throat Thickness"] * (1 - Deep[Item])))  # part of the a which cannot be averaged
-        ExtAPILogWriteMessage("getValue: elemId:{0} Finish1".format(str(elemId)))
-        return [ 1 - max(sals) / max(vals) ]
+        return [ abs( 1 - max(sals) / max(vals) ) ]
     elif Type == "No":
         for analysisName in StaticLoadCases:
             for resultSet in StaticLoadCases[analysisName]:
@@ -613,9 +608,10 @@ def getValue(result,elemId):
             for resultSet in FatigueLoadCases[analysisName]:
                 vals.append(Data[Identifier][analysisName][resultSet][elemId][WeldType][NotchCase][Item])
                 sals.append(Data[Identifier][analysisName][resultSet][elemId][WeldType]["Static"][Item])
-        ExtAPILogWriteMessage("getValue: elemId:{0} Finish2".format(str(elemId)))
-        return [float(max(vals)) / float(max(sals))]
-    ExtAPILogWriteMessage("getValue: elemId:{0} Finish3".format(str(elemId)))
+        if max(vals) == 5.0: 
+            return [0.0] # te kort door de bocht?
+        else:
+            return [float(max(vals)) / float(max(sals))]
     return [max(vals)*1.0]
 
 def selectEdgeByElem(load,prop):
@@ -970,26 +966,27 @@ def destroyDB(result,step):
         # return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, End Master Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
 
-
+class SlaveProperties:
+    def __init__(self,result):
+        Properties      = result.Properties
+        self.Identifier      = Properties.GetByName("Identifier").Value
+        self.Type            = Properties.GetByName("FatigueCalculation").Value
+        self.Item            = Properties.GetByName("Item").Value
+        self.WeldType        = Properties.GetByName("WeldType").Value
+        self.NotchCase       = Properties.GetByName("NotchCase").Value
+        self.StaticLoadCases = eval(Properties.GetByName("lc").Value)
+        self.CraneGroup      = Properties.GetByName("CraneGroup").Value
+        self.FatigueLoadCases = eval(Properties.GetByName("lcFatigue").Value)
     
 def startSlave(result,step):
-    # if not result.Analysis.ResultsData.ResultSetCount == step:
-        # return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, Start Slave Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
-    Properties      = result.Properties
-    Identifier      = Properties.GetByName("Identifier").Value
-    Type            = Properties.GetByName("FatigueCalculation").Value
-    Item            = Properties.GetByName("Item").Value
-    WeldType        = Properties.GetByName("WeldType").Value
-    NotchCase       = Properties.GetByName("NotchCase").Value
-    StaticLoadCases = eval(Properties.GetByName("lc").Value)
-    CraneGroup      = Properties.GetByName("CraneGroup").Value
-    FatigueLoadCases = eval(Properties.GetByName("lcFatigue").Value)
-
+    global sp
+    sp = SlaveProperties(result)
+    
 def endSlave(result,step):
-    # if not result.Analysis.ResultsData.ResultSetCount == step:
-        # return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, End Slave Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
+    global sp
+    del sp
     
 
 # import doctest
