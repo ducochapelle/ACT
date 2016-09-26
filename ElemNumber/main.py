@@ -89,6 +89,7 @@ def validateElement(a,b):
     return
     
 def selectStyle(analysis,prop):
-    prop.ClearOptions()
-    prop.AddOption("Fancy")
-    prop.AddOption("Shabby")
+    prop.Options.Clear()
+    prop.Options.Add("Fancy")
+    prop.Options.Add("Shabby")
+

@@ -1,8 +1,9 @@
 <extension version="1" name="ElemNumber">
+	<guid>2e62d622-608d-4d82-a0e3-1ee4cda991bf</guid>
     <script src="main.py"/>
     <interface context="Mechanical">
         <images>images</images>
-        <toolbar name="APDL2" caption="HI-Toolbar2">
+        <toolbar name="DCH-Toolbar" caption="DCH-Toolbar">
             <entry name="ElemNumber" icon="ElemNumber">
                 <callbacks>
                     <onclick>createElemNumber</onclick>
@@ -18,12 +19,12 @@
 				<onhide>hideElement</onhide>
             </callbacks>
             <details>
-                <property name="ElemNumber" caption="Element Number" datatype="int" control="text" default="0">	
+                <property name="ElemNumber" caption="Element Number" control="text" default="0">	
 					<callbacks>
 						<onvalidate>validateElement</onvalidate>
 					</callbacks>
                 </property>
-                <property name="Style" caption="Style" datatype="string" control="select" default="Fancy">	
+                <property name="Style" caption="Style" control="select" default="Fancy">	
 					<callbacks>
 						<onactivate>selectStyle</onactivate>
 						<onvalidate>validateElement</onvalidate>
