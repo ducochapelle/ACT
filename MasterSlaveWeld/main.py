@@ -6,11 +6,13 @@
 # 0 Fatigue K factor klopt niet?
 # 0.5 make Identifier true int instead of semi string
 
-# BUG: when inserted in an environmen with multiple load cases it will run multiple times. Fuck it.
+# BUG: when inserted in an environmen with multiple load cases it will run multiple times. Somehow even if getvalue does nothing, it takes tenths of seconds to run.
 # ? Use time to display different results instead of multiple result probes (like weld type or notch case)
 
 # 1  Add 'beta' option, a factor on FW.
 # 1.3 enable unselecting elements between analysises. -- zie MultiWeldScaleScope
+# -> NOPE, scope all bodies is bugy
+# -> also if allowables change, the calculation won't be there
 # 1.5 bug: D O E S  N O T  W O R K  I N DesignAssessment
 # 1.5 Onendeval data van mesh en tijd en load cases bij houden
 # 1.8 clear results moet eigenlijk ook zijn slaves clearen.
@@ -22,16 +24,11 @@
 # 2 move often used strings to global object for maintainability
 
 # 3 Check if loadcase exists
-# 3 When edge is curved; use edge nodes if they are not on top of each other.
 # 3 possible huge time gain by using ElementValues instead of ElementValue
 # 3 import cProfile of profiler, eerst downloaden. Zodat je de echte versie hebt en fatsoenlijk kan profilen.
 # 3 fix bug where all the readonly's are on their default value when just inserted; maybe do keypress up and down?
 
 # 4 OOIT automatisch shear factor weld herverdelen
-
-#TODO: named selection zodat je alleen op een subsectie kan draaien 
-# -> NOPE, scope all bodies is bugy
-# -> also if allowables change, the calculation won't be there
 
 # shear keyoption?  
 
@@ -132,72 +129,44 @@ def validateLoadCases(result, property):
         property.Value = str(DefaultLoadCases())
  
 def getNormalDirection(edge,elemId, Mesh):
-    # returns the unitvector perpendicular to the edge and in the plane of the face
-    CurveType = edge.CurveType
-    ExtAPI.Log.WriteMessage("{0}: getNormalDirection of edge {1}, element {2}".format(datetime.now(), edge.Id, elemId))
-    if CurveType != CurveType.GeoCurveLine: 
-        # The element and face method seem just as fast. Lets go element all the way?
-        if CurveType == CurveType.GeoCurveBSpline or CurveType == CurveType.GeoCurveCircle:
-            # define two edge nodes (n1, n2)
-            edgeNodeIds = set(Mesh.MeshRegionById(edge.Id).NodeIds)
-            elemNodeIds = set(Mesh.ElementById(elemId).NodeIds)
-            e_e_NodeIds = list(edgeNodeIds & elemNodeIds) # use .pop on set instead ...
-            if len(e_e_NodeIds) < 2:
-                ExtAPI.Application.LogWarning("Error in function getNormalDirection: element {1} somehow has less than 2 nodes on edge {0} ".format(edge.Id, elemId))
-            # define vector of edge nodes (A) 
-            n1 = Mesh.NodeById(e_e_NodeIds[0])
-            n2 = Mesh.NodeById(e_e_NodeIds[1])
-            A = ( n2.X - n1.X,
-                  n2.Y - n1.Y,
-                  n2.Z - n1.Z)
-            A_length = ( A[0]**2+A[1]**2+A[2]**2 ) ** ( 0.5 ) # use sqrt(sum(tuple(x**2 for x in A))) instead...
-            A_unit = (A[0]/A_length,
-                        A[1]/A_length,
-                        A[2]/A_length)
-            # take an additional node which is not in line (n3)
-            additional_nodeIds = list(elemNodeIds ^ elemNodeIds & edgeNodeIds)
-            additional_nodeId = additional_nodeIds[0]
-            n3 = Mesh.NodeById(additional_nodeId)
-            # define vector of n1 to n3 (B)
-            B = (n3.X - n1.X,
-                 n3.Y - n1.Y,
-                 n3.Z - n1.Z)
-            # define component of B that is in A (C)
-            BdotA_unit = sum([x*y for x,y in zip(B,A_unit)])
-            C = [BdotA_unit*A_unit[n] for n in range(3)]
-            # define component of B that is not in A, substract C from B (D)
-            D = (B[0] - C[0],
-                 B[1] - C[1],
-                 B[2] - C[2])
-            # unitize it
-            D_length = ( D[0]**2+D[1]**2+D[2]**2 ) ** ( 0.5 )
-            D_unit = (D[0]/D_length, D[1]/D_length, D[2]/D_length)
-            # get third vector perpendicular to the two
-            E_unit = (   A_unit[1] * D_unit[2] - A_unit[2] * D_unit[1],
-                                A_unit[2] * D_unit[0] - A_unit[0] * D_unit[2],
-                                A_unit[0] * D_unit[1] - A_unit[1] * D_unit[0])
-            ExtAPI.Log.WriteMessage("{0}: endNormalDirection curve".format(datetime.now()))
-            return (D_unit,A_unit,E_unit)        # normal, length, cross
-        else:
-            ExtAPI.Application.LogWarning("Error in function getNormalDirection: CurveType of edge {0} is not GeoCurveLine, GeoCurveBSpline or GeoCurveCircle. Element {1} is calculated with fake weld direction".format(edge.Id, elemId))
-            return ((0,0,1),(0,1,0),(1,0,0))
-    else:
-        edgeVector = (edge.StartVertex.X - edge.EndVertex.X,
-                      edge.StartVertex.Y - edge.EndVertex.Y,
-                      edge.StartVertex.Z - edge.EndVertex.Z)
-        edgeVectorLength = ( edgeVector[0]**2+edgeVector[1]**2+edgeVector[2]**2 ) ** ( 0.5 )
-        edgeUnit = (edgeVector[0]/edgeVectorLength,
-                    edgeVector[1]/edgeVectorLength,
-                    edgeVector[2]/edgeVectorLength)
-        face = FaceByElemId[elemId]
-        plateNormal = (face.Normals[0], \
-                       face.Normals[1], \
-                       face.Normals[2])
-        Norm = (edgeUnit[1] * plateNormal[2] - edgeUnit[2] * plateNormal[1],
-                edgeUnit[2] * plateNormal[0] - edgeUnit[0] * plateNormal[2],
-                edgeUnit[0] * plateNormal[1] - edgeUnit[1] * plateNormal[0])
-        ExtAPI.Log.WriteMessage("{0}: endNormalDirection straigth".format(datetime.now()))
-        return (Norm,edgeUnit,plateNormal)
+    # returns the unitvectors alongside the edge, the second one and perpendicular to element
+    ExtAPILogWriteMessage("getNormalDirection of edge {0}, element {1}".format(edge.Id, elemId))
+    # define two edge nodes (n1, n2)
+    edgeNodeIds = set(Mesh.MeshRegionById(edge.Id).NodeIds)
+    elemNodeIds = set(Mesh.ElementById(elemId).NodeIds)
+    e_e_NodeIds = list(edgeNodeIds & elemNodeIds) # use .pop on set instead ...
+    # define vector of edge nodes (A) 
+    n1 = Mesh.NodeById(e_e_NodeIds[0])
+    n2 = Mesh.NodeById(e_e_NodeIds[1])
+    A = ( n2.X - n1.X,
+          n2.Y - n1.Y,
+          n2.Z - n1.Z)
+    A_length = ( A[0]**2+A[1]**2+A[2]**2 ) ** ( 0.5 ) # use sqrt(sum(tuple(x**2 for x in A))) instead...
+    A_unit = (A[0]/A_length,
+              A[1]/A_length,
+              A[2]/A_length)
+    # take an additional node which is not in line (n3)
+    n3 = Mesh.NodeById((elemNodeIds ^ elemNodeIds & edgeNodeIds).pop())
+    # define vector of n1 to n3 (B)
+    B = (n3.X - n1.X,
+         n3.Y - n1.Y,
+         n3.Z - n1.Z)
+    # define component of B that is in A (C)
+    BdotA_unit = sum([x*y for x,y in zip(B,A_unit)])
+    C = [BdotA_unit*A_unit[n] for n in range(3)]
+    # define component of B that is not in A, substract C from B (D)
+    D = (B[0] - C[0],
+         B[1] - C[1],
+         B[2] - C[2])
+    # unitize it
+    D_length = ( D[0]**2+D[1]**2+D[2]**2 ) ** ( 0.5 )
+    D_unit = (D[0]/D_length, D[1]/D_length, D[2]/D_length)
+    # get third vector perpendicular to the two
+    E_unit = (  A_unit[1] * D_unit[2] - A_unit[2] * D_unit[1],
+                A_unit[2] * D_unit[0] - A_unit[0] * D_unit[2],
+                A_unit[0] * D_unit[1] - A_unit[1] * D_unit[0])
+    ExtAPILogWriteMessage("endNormalDirection")
+    return (D_unit,A_unit,E_unit)        # normal, length, cross
 
 class Tensor():
     def __init__(self, t, u=None):
@@ -221,14 +190,18 @@ class Tensor():
         return M
 
 def createDB(result,step):
-    # delete Data? dit staat nu in onevaluate dus volgens mij kan dat. <-----------------------------------------------
-    # if not result.Analysis.ResultsData.ResultSetCount == step:
-        # return
+    if not 1 == step:
+        return
+    ExtAPI.Log.WriteMessage("{0} Step: {3}, Start Master Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))    
     ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> CreateDB: Reverse Dictionaries")
     #move all this to a class     
     global WeldElements
     global FaceByElemId                                                                                   
     global EdgesByElemId
+    WeldElements = []
+    FaceByElemId = {}
+    EdgesByElemId = {}
+
     Mesh = result.Analysis.MeshData
     if WeldElements == []:  # deze loop naar een functie
         ExtAPILogWriteMessage("CreateDB: WeldElementLoop")
@@ -270,6 +243,7 @@ def createDB(result,step):
                         WeldElements.append(elem)
     Identifier = result.Properties.GetByName("Identifier").Value
     global Data
+    Data.pop(Identifier, None)
     if not Identifier in Data:
         ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> CreateDB: Identifier {0}".format(str(Identifier)))
         Data[Identifier] = {}
@@ -597,10 +571,10 @@ def maxabs_over_minabs(x):
     return min(x)/max(x) if abs(min(x)) < max(x) and max(x) != 0 else max(x)/min(x) if min(x) != 0 else 1
     
 def getValue(result,elemId):
-    global WeldElements
+    if sp == None:
+        return [0.0] # dit kost die kut al tienden van secondes. 
     if elemId not in WeldElements:
         return []
-    global sp # door die class maar 1 keer aan te maken ipv voor elk element die properties te vragen.. 120 sec -> 80 sec per slave
     Identifier      = sp.Identifier      
     Type            = sp.Type            
     Item            = sp.Item            
@@ -609,9 +583,8 @@ def getValue(result,elemId):
     StaticLoadCases = sp.StaticLoadCases 
     CraneGroup      = sp.CraneGroup      
     FatigueLoadCases= sp.FatigueLoadCases
-    global Data
     if not Identifier in Data:
-        return []
+        return [0.0]
 
     # Ok dit is een ingewikkeld stuk... maar het kost echt nul computation time... superraar.
     vals = []
@@ -1005,8 +978,6 @@ def unittest():
     pass
 
 def destroyDB(result,step):
-    # if not result.Analysis.ResultsData.ResultSetCount == step:
-        # return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, End Master Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
 
 class SlaveProperties:
@@ -1022,8 +993,12 @@ class SlaveProperties:
         self.FatigueLoadCases = eval(Properties.GetByName("lcFatigue").Value)
     
 def startSlave(result,step):
-    ExtAPI.Log.WriteMessage("{0} Step: {3}, Start Slave Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
+    # check if this is the last step, doe het alleen op de last step?
     global sp
+    if result.Analysis.ResultsData.ResultSetCount != step:
+        sp = None
+        return
+    ExtAPI.Log.WriteMessage("{0} Step: {3}, Start Slave Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
     sp = SlaveProperties(result)
     
 def endSlave(result,step):
