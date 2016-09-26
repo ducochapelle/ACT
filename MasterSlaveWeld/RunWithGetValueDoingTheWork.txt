@@ -1,0 +1,122 @@
+<html>                                        
+<head>                                        
+<style type="text/css">                       
+  .error { color:red; }                       
+</style>                                      
+2013-04-18 10:02:40.465000</head>                                       
+<body>                                        
+<br/>                                         
+<br/>                                         
+Add new property Identifier for load Master.<br/>
+Add new property FatigueCalculation for load Master.<br/>
+Add new property lc for load Master.<br/>
+Add new property lcFatigue for load Master.<br/>
+Add new property CraneGroup for load Master.<br/>
+Add new property addSlaves for load Master.<br/>
+Add new property ClearResults for load Master.<br/>
+Add new property empty for load Master.<br/>
+Add new property EdgeByElem for load Master.<br/>
+Add new property EdgeOfModel for load Master.<br/>
+Result created...<br/>
+Add new property Identifier for load Slave.<br/>
+Add new property FatigueCalculation for load Slave.<br/>
+Add new property Item for load Slave.<br/>
+Add new property WeldType for load Slave.<br/>
+Add new property NotchCase for load Slave.<br/>
+Add new property CraneGroup for load Slave.<br/>
+Add new property lc for load Slave.<br/>
+Add new property lcFatigue for load Slave.<br/>
+Result created...<br/>
+Add new property Identifier for load Slave.<br/>
+Add new property FatigueCalculation for load Slave.<br/>
+Add new property Item for load Slave.<br/>
+Add new property WeldType for load Slave.<br/>
+Add new property NotchCase for load Slave.<br/>
+Add new property CraneGroup for load Slave.<br/>
+Add new property lc for load Slave.<br/>
+Add new property lcFatigue for load Slave.<br/>
+Result created...<br/>
+Add new property Identifier for load Slave.<br/>
+Add new property FatigueCalculation for load Slave.<br/>
+Add new property Item for load Slave.<br/>
+Add new property WeldType for load Slave.<br/>
+Add new property NotchCase for load Slave.<br/>
+Add new property CraneGroup for load Slave.<br/>
+Add new property lc for load Slave.<br/>
+Add new property lcFatigue for load Slave.<br/>
+Result created...<br/>
+Add new property Identifier for load Slave.<br/>
+Add new property FatigueCalculation for load Slave.<br/>
+Add new property Item for load Slave.<br/>
+Add new property WeldType for load Slave.<br/>
+Add new property NotchCase for load Slave.<br/>
+Add new property CraneGroup for load Slave.<br/>
+Add new property lc for load Slave.<br/>
+Add new property lcFatigue for load Slave.<br/>
+Result created...<br/>
+Add new property Identifier for load Slave.<br/>
+Add new property FatigueCalculation for load Slave.<br/>
+Add new property Item for load Slave.<br/>
+Add new property WeldType for load Slave.<br/>
+Add new property NotchCase for load Slave.<br/>
+Add new property CraneGroup for load Slave.<br/>
+Add new property lc for load Slave.<br/>
+Add new property lcFatigue for load Slave.<br/>
+Result created...<br/>
+Add new property Identifier for load Slave.<br/>
+Add new property FatigueCalculation for load Slave.<br/>
+Add new property Item for load Slave.<br/>
+Add new property WeldType for load Slave.<br/>
+Add new property NotchCase for load Slave.<br/>
+Add new property CraneGroup for load Slave.<br/>
+Add new property lc for load Slave.<br/>
+Add new property lcFatigue for load Slave.<br/>
+Result created...<br/>
+<br/>
+2013-04-18 10:03:06.319000 >>> CreateDB: Reverse Dictionaries<br/>
+2013-04-18 10:03:14.175000 >>> CreateDB: Identifier 0<br/>
+2013-04-18 10:03:44.474000 >>> CreateDB: Finished Static Without Errors<br/>
+2013-04-18 10:03:44.730000 Step: 1, End Master Id: 0, Item: Weld Master<br/>
+2013-04-18 10:03:44.742000 Step: 1, Start Slave Id: 0, Item: [0] 2xFW Static<br/>
+2013-04-18 10:04:04.640000 Step: 1, End Slave Id: 0, Item: [0] 2xFW Static<br/>
+2013-04-18 10:04:04.645000 Step: 1, Start Slave Id: 0, Item: [0] 2xPP Static<br/>
+2013-04-18 10:04:24.411000 Step: 1, End Slave Id: 0, Item: [0] 2xPP Static<br/>
+2013-04-18 10:04:24.415000 Step: 1, Start Slave Id: 0, Item: [0] 1xPP Static<br/>
+2013-04-18 10:04:44.193000 Step: 1, End Slave Id: 0, Item: [0] 1xPP Static<br/>
+2013-04-18 10:04:44.197000 Step: 1, Start Slave Id: 0, Item: [0] 2xFW Static Shear Factor<br/>
+2013-04-18 10:05:04.050000 Step: 1, End Slave Id: 0, Item: [0] 2xFW Static Shear Factor<br/>
+2013-04-18 10:05:04.054000 Step: 1, Start Slave Id: 0, Item: [0] 2xPP Static Shear Factor<br/>
+2013-04-18 10:05:23.930000 Step: 1, End Slave Id: 0, Item: [0] 2xPP Static Shear Factor<br/>
+2013-04-18 10:05:23.934000 Step: 1, Start Slave Id: 0, Item: [0] 1xPP Static Shear Factor<br/>
+2013-04-18 10:05:43.771000 Step: 1, End Slave Id: 0, Item: [0] 1xPP Static Shear Factor<br/>
+2013-04-18 10:05:43.775000 >>> CreateDB: Reverse Dictionaries<br/>
+2013-04-18 10:05:43.775000 >>> CreateDB: Finished Static Without Errors<br/>
+2013-04-18 10:05:43.865000 Step: 2, End Master Id: 0, Item: Weld Master<br/>
+2013-04-18 10:05:43.867000 Step: 2, Start Slave Id: 0, Item: [0] 2xFW Static<br/>
+2013-04-18 10:06:03.721000 Step: 2, End Slave Id: 0, Item: [0] 2xFW Static<br/>
+2013-04-18 10:06:03.724000 Step: 2, Start Slave Id: 0, Item: [0] 2xPP Static<br/>
+2013-04-18 10:06:23.707000 Step: 2, End Slave Id: 0, Item: [0] 2xPP Static<br/>
+2013-04-18 10:06:23.709000 Step: 2, Start Slave Id: 0, Item: [0] 1xPP Static<br/>
+2013-04-18 10:06:43.519000 Step: 2, End Slave Id: 0, Item: [0] 1xPP Static<br/>
+2013-04-18 10:06:43.522000 Step: 2, Start Slave Id: 0, Item: [0] 2xFW Static Shear Factor<br/>
+2013-04-18 10:07:03.359000 Step: 2, End Slave Id: 0, Item: [0] 2xFW Static Shear Factor<br/>
+2013-04-18 10:07:03.362000 Step: 2, Start Slave Id: 0, Item: [0] 2xPP Static Shear Factor<br/>
+2013-04-18 10:07:23.207000 Step: 2, End Slave Id: 0, Item: [0] 2xPP Static Shear Factor<br/>
+2013-04-18 10:07:23.210000 Step: 2, Start Slave Id: 0, Item: [0] 1xPP Static Shear Factor<br/>
+2013-04-18 10:07:43.100000 Step: 2, End Slave Id: 0, Item: [0] 1xPP Static Shear Factor<br/>
+2013-04-18 10:07:43.108000 >>> CreateDB: Reverse Dictionaries<br/>
+2013-04-18 10:07:43.109000 >>> CreateDB: Finished Static Without Errors<br/>
+<br/>
+2013-04-18 10:07:43.199000 Step: 2, End Master Id: 0, Item: Weld Master<br/>
+2013-04-18 10:07:43.202000 Step: 2, Start Slave Id: 0, Item: [0] 2xFW Static<br/>
+2013-04-18 10:08:02.951000 Step: 2, End Slave Id: 0, Item: [0] 2xFW Static<br/>
+2013-04-18 10:08:02.954000 Step: 2, Start Slave Id: 0, Item: [0] 2xPP Static<br/>
+2013-04-18 10:08:22.765000 Step: 2, End Slave Id: 0, Item: [0] 2xPP Static<br/>
+2013-04-18 10:08:22.768000 Step: 2, Start Slave Id: 0, Item: [0] 1xPP Static<br/>
+2013-04-18 10:08:42.559000 Step: 2, End Slave Id: 0, Item: [0] 1xPP Static<br/>
+2013-04-18 10:08:42.563000 Step: 2, Start Slave Id: 0, Item: [0] 2xFW Static Shear Factor<br/>
+2013-04-18 10:09:02.339000 Step: 2, End Slave Id: 0, Item: [0] 2xFW Static Shear Factor<br/>
+2013-04-18 10:09:02.342000 Step: 2, Start Slave Id: 0, Item: [0] 2xPP Static Shear Factor<br/>
+2013-04-18 10:09:22.084000 Step: 2, End Slave Id: 0, Item: [0] 2xPP Static Shear Factor<br/>
+2013-04-18 10:09:22.088000 Step: 2, Start Slave Id: 0, Item: [0] 1xPP Static Shear Factor<br/>
+2013-04-18 10:09:41.878000 Step: 2, End Slave Id: 0, Item: [0] 1xPP Static Shear Factor<br/>

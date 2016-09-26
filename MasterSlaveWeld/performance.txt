@@ -1,0 +1,27 @@
+	STATIC
+
+		1 case	4 cases	220,000 elements & 200,000 nodes
+WeldElements	11 	11	 s 
+First loop, 	  2 	2	ms / element	(called cases times)
+Second loop, 	  5 	12	ms / element	(called one time)
+  cDB		
+getvalue weld, 	2.8  	~3	ms / element
+getvalue nonwld,2.3 	~2	ms / element
+
+MSW		2 cases	21 lc 	42,000 elements & 42,000 nodes
+WeldElements	8	9	s   
+CreateDB	37 	315	s   
+GetValue	80	82	s  / 6 probes
+  total-bug	117	397	s
+  total+bug	277	1050	s (GetValue is called 2+1 times)
+Fat-o-stat		1162	s (GetValue is called 2+1 times)
+
+	FATIGUE
+
+4 cases 220,000 elements | 200,000 nodes, fat-or-stat, 98 minutes
+( 12,000 + 200,000 (3*1 + 12*1 + 6*2)) / 60,000 = 	97 minutes
+
+	GENERIC FORMULEA
+
+so: (0.05 + 2*cases + 15 + 2.5 ) #elements / 60,000 = time in min
+       	 (18+2*cases) * #elements * ±1.1 / 60,000 = time in min
