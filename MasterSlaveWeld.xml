@@ -1,9 +1,9 @@
 <extension version="1" name="MasterSlaveWeld">
-    <script src="[ext.Folder]\main.py"/>
+    <script src="main.py"/>
     <interface context="Mechanical">
 		<oninit>doClearLog</oninit>
-        <images>[ext.Folder]\images</images>
-        <toolbar name="APDL" caption="HI-Toolbar">
+        <images>images</images>
+        <toolbar name="APDL1" caption="HI-Toolbar1">
             <entry name="Master" icon="WeldMaster">
                 <callbacks>
                     <onclick>createMaster</onclick>

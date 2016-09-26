@@ -1,8 +1,8 @@
 <extension version="1" name="ElemNumber">
-    <script src="[ext.Folder]\main.py"/>
+    <script src="main.py"/>
     <interface context="Mechanical">
-        <images>[ext.Folder]\images</images>
-        <toolbar name="APDL" caption="HI-Toolbar">
+        <images>images</images>
+        <toolbar name="APDL2" caption="HI-Toolbar2">
             <entry name="ElemNumber" icon="ElemNumber">
                 <callbacks>
                     <onclick>createElemNumber</onclick>

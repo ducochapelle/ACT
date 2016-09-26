@@ -1,9 +1,9 @@
 <extension version="1" name="CartwheelCP">
-  <script src="[ext.Folder]\main.py" />
+  <script src="main.py" />
   <interface context="Mechanical">
-    <images>[ext.Folder]\images</images>
+    <images>images</images>
 	<oninit>doClearLog</oninit>
-    <toolbar name="APDL" caption="HI-Toolbar">
+    <toolbar name="APDL3" caption="HI-Toolbar3">
       <entry name="CartwheelCP" icon="CartwheelCP">
         <callbacks>
            <onclick>ButtonClick1</onclick>

@@ -33,16 +33,16 @@
 # shear keyoption?  
 
 # System.Diagnostics.Debugger.Break()
+if ExtAPI.Context == "Mechanical":
+    from datetime import datetime 
+    Data = {} 
+    WeldElements = [] 
+    FaceByElemId = {}
+    EdgesByElemId = {}
 
-from datetime import datetime 
-Data = {} 
-WeldElements = [] 
-FaceByElemId = {}
-EdgesByElemId = {}
-
-# NotchCases = ["W0","W1","W2","K0","K1","K2","K3","K3/4","K4"]
-NotchCases = ["K0","K1","K2","K3"]
-weldThroats = range(5,25,1) + range(25,50,5) + range(50,100,10) + [100,120,150,200]
+    # NotchCases = ["W0","W1","W2","K0","K1","K2","K3","K3/4","K4"]
+    NotchCases = ["K0","K1","K2","K3"]
+    weldThroats = range(5,25,1) + range(25,50,5) + range(50,100,10) + [100,120,150,200]
 
 def ExtAPILogWriteMessage(string):
     # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))

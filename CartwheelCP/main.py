@@ -18,31 +18,31 @@
 # when suppressed -> not visible
 # ask area instead of diameter (or maybe even auto-calculate with edge-area-thickness, line length and node count)
 # change spoke diameter to spoke area
-
-from math import hypot
-from datetime import datetime
-drawingObjects = {}
-NearestNodeIdByEdgeId = {}
-GlobalLocationByNodeId = {}
-global ColorTable
-ColorTable =    {"Red"       :0xFF0000,
-                 "Maroon"    :0x800000,
-                 "Brown"     :0xA52A2A,
-                 "Orange"    :0xFFA500,
-                 "Yellow"    :0xFFFF00,
-                 "Lime"      :0x00FF00,
-                 "Green"     :0x008000,
-                 "Olive"     :0x808000,
-                 "Cyan"      :0x00FFFF,
-                 "Blue"      :0x0000FF,
-                 "LightBlue" :0xADD8E6,
-                 "DarkBlue"  :0x0000A0,
-                 "Fuchsia"   :0xFF00FF,
-                 "Purple"    :0x800080,
-                 "White"     :0xFFFFFF,
-                 "Silver"    :0xC0C0C0,
-                 "Grey"      :0x808080,
-                 "Black"     :0x000000}
+if ExtAPI.Context == "Mechanical":
+    from math import hypot
+    from datetime import datetime
+    drawingObjects = {}
+    NearestNodeIdByEdgeId = {}
+    GlobalLocationByNodeId = {}
+    global ColorTable
+    ColorTable =    {"Red"       :0xFF0000,
+                     "Maroon"    :0x800000,
+                     "Brown"     :0xA52A2A,
+                     "Orange"    :0xFFA500,
+                     "Yellow"    :0xFFFF00,
+                     "Lime"      :0x00FF00,
+                     "Green"     :0x008000,
+                     "Olive"     :0x808000,
+                     "Cyan"      :0x00FFFF,
+                     "Blue"      :0x0000FF,
+                     "LightBlue" :0xADD8E6,
+                     "DarkBlue"  :0x0000A0,
+                     "Fuchsia"   :0xFF00FF,
+                     "Purple"    :0x800080,
+                     "White"     :0xFFFFFF,
+                     "Silver"    :0xC0C0C0,
+                     "Grey"      :0x808080,
+                     "Black"     :0x000000}
 
 
 def ClearLog():

@@ -1,7 +1,7 @@
 #add node selection?
-
-ctxCartwheel = None
-LocationByNodeId = None
+if ExtAPI.Context == "Mechanical":
+    ctxCartwheel = None
+    LocationByNodeId = None
 
 def createElemNumber(analysis):
     analysis.CreateResultObject("ElemNumber")
