@@ -1,4 +1,6 @@
 #work out a standard for adjectiveNoun or AdjectiveNoun
+#TODO: named selection zodat je alleen op een subsectie kan draaien
+#TODO: check if loadcase exists
 
 from datetime import datetime
 global Identifier
@@ -24,15 +26,35 @@ def clearLog():
 
 def createLoad(analysis):
     ExtAPILogWriteMessage("createLoad...")
+        
+    AnalysisNames = ExtAPI.DataModel.AnalysisNames
+    ExtAPILogWriteMessage(str(AnalysisNames))
+    
+    LoadCases = {}
+    for analysisName in AnalysisNames:
+        try:
+            temp = ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.Result("S")
+            del temp
+        except:
+            continue
+        LoadCases[analysisName] = {}
+        for set in range(1,ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.ResultSetCount+1):
+            LoadCases[analysisName][set]=230
+        
     analysis.CreateResultObject("MultiWeldscale")
     analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "2xFW"
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("lc").Value = str(LoadCases)
     analysis.CreateResultObject("MultiWeldscale")
     analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "2xPP"
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("lc").Value = str(LoadCases)
     analysis.CreateResultObject("MultiWeldscale")
     analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "1xPP"
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("lc").Value = str(LoadCases)
     analysis.CreateResultObject("MultiWeldscale")
     analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("WeldType").Value = "2xFW"
     analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("Display").Value = "Scaled Longitudinal over Equivalent (von-Mises) Stress"
+    analysis.ResultObjects[analysis.ResultObjects.Count-1].Properties.GetByName("lc").Value = str(LoadCases)
+    
 
 def doClearLog(analysis):
     clearLog()
@@ -59,23 +81,6 @@ def getNormalDirection(edge,face):
             plateNormal[2] * edgeUnit[0] - plateNormal[0] * edgeUnit[2],
             plateNormal[0] * edgeUnit[1] - plateNormal[1] * edgeUnit[0])
             
-    # edgeStartVertex = edge.StartVertex
-    # edgeEndVertex = edge.EndVertex
-    
-    # plateNormal = face.Normals[0:3]
-    
-    # edgeVector = (edgeStartVertex.X - edgeEndVertex.X,
-                  # edgeStartVertex.Y - edgeEndVertex.Y,
-                  # edgeStartVertex.Z - edgeEndVertex.Z)
-    # edgeVectorLength = ( edgeVector[0]**2+edgeVector[1]**2+edgeVector[2]**2 ) ** ( 0.5 )
-    # edgeUnit = (edgeVector[0]/edgeVectorLength,
-                # edgeVector[1]/edgeVectorLength,
-                # edgeVector[2]/edgeVectorLength)
-    # Norm = (plateNormal[1] * edgeUnit[2] - plateNormal[2] * edgeUnit[1],
-            # plateNormal[2] * edgeUnit[0] - plateNormal[0] * edgeUnit[2],
-            # plateNormal[0] * edgeUnit[1] - plateNormal[1] * edgeUnit[0])
-            
-    # return {"Normal":Norm, "Long":edgeUnit, "Cross":plateNormal}      # tested for performance, dict vs tuple, didnt matter. tuple vs array doesnt matter either.
     ExtAPILogWriteMessage("return getNormalDirection ")
     return (Norm,edgeUnit,plateNormal)
     
@@ -86,23 +91,22 @@ def inProduct(F,u):
 
 def getValue(result,SelemId):
     ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+"START: GetValue of "+str(SelemId))
-    
 
-
-    ExtAPILogWriteMessage("Test existence of CreatedReverseLookupDictionairy ")
+    ExtAPILogWriteMessage("Test existence of the fkin CreatedReverseLookupDictionairy ")
     try:
         if CreatedReverseLookupDictionairy == 1:
             ExtAPILogWriteMessage("Allready Created Reverse Lookup Dictionairy")
             pass
     except:
-        # push this whole except in a seperate button on the toolbar?
-        ExtAPILogWriteMessage("Create Reverse Lookup Dictionairy ")
+        ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> Create Geometry Dictionary...")
         global CreatedReverseLookupDictionairy
         CreatedReverseLookupDictionairy = 1
         
         global FaceByElemId                                                                                 
         global EdgesByElemId 
         global WeldElements
+        
+        mesh = result.Analysis.MeshData
         
         NodesOnLines = set([])                                                                              
         WeldElements = []
@@ -113,40 +117,49 @@ def getValue(result,SelemId):
         for assembly in result.Analysis.GeoData.Assemblies:
             for part in assembly.Parts:
                 for body in part.Bodies:
+                    ExtAPILogWriteMessage("Body: "+str(body.Id))
                     if body.Suppressed == True:
                         continue
+                    if not str(body.BodyType) == "GeoBodySheet":
+                        continue
                     for face in body.Faces:     #ASLV
+                        ExtAPILogWriteMessage("Face: "+str(face.Id))
                         for edge in face.Edges:     #LSLA
+                            ExtAPILogWriteMessage("Edge: "+str(edge.Id))
                             if result.Analysis.MeshData.MeshRegionById(edge.Id).NodeCount == 0: #Edges which are skipped with meshing
                                 continue
-                            elif edge.Faces.Count < 2:    #If the edge doesn't have multiple faces, it's not a weld
+                            if edge.Faces.Count < 2:    #If the edge doesn't have multiple faces, it's not a weld
                                 continue
-                            elif edge.Vertices.Count == 0:
+                            if not edge.Vertices.Count == 2:
                                 continue
-                            for NodeId in result.Analysis.MeshData.MeshRegionById(edge.Id).NodeIds:     #NSLL
-                                for ConnectedElementId in result.Analysis.MeshData.NodeById(NodeId).ConnectedElementIds:    #ESLN 
+                            if edge.Vertices[0].Id == edge.Vertices[1].Id:
+                                continue
+                            NodeIdsOnEdge = mesh.MeshRegionById(edge.Id).NodeIds
+                            for NodeId in NodeIdsOnEdge:     #NSLL
+                                for ConnectedElementId in mesh.NodeById(NodeId).ConnectedElementIds:    #ESLN 
+                                    nodesOnTheLine = 0
+                                    for NodeIdeep in mesh.ElementById(ConnectedElementId).NodeIds:
+                                        if NodeIdeep in NodeIdsOnEdge:
+                                            nodesOnTheLine += 1
+                                    if nodesOnTheLine ==1:
+                                        continue
                                     if not edge.Id in [x.Id for x in EdgesByElemId[ConnectedElementId]]:
                                         EdgesByElemId[ConnectedElementId].append(edge)
-                        for ElementId in result.Analysis.MeshData.MeshRegionById(face.Id).ElementIds:
+                        for ElementId in mesh.MeshRegionById(face.Id).ElementIds:
                             FaceByElemId[ElementId] = face
-        ExtAPILogWriteMessage("Created Reverse Lookup Dictionairy ") 
-        for elem in result.Analysis.MeshData.ElementIds:                                                    
+        for elem in mesh.ElementIds:                                                    
             if not EdgesByElemId[elem].Count == 0:
-                if int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
+                if int(mesh.ElementById(elem).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
                     WeldElements.append(elem)
-
-        # ExtAPILogWriteMessage(str(ExtAPI.DataModel.AnalysisNames))
-
-        global AnalysisNames
-        global LoadCases
-
+        ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> Created Geometry Dictionary...") 
         
-        AnalysisNames = ExtAPI.DataModel.AnalysisNames
-        ExtAPILogWriteMessage(str(AnalysisNames))
+        ExtAPILogWriteMessage(str(ExtAPI.DataModel.AnalysisNames))
+        # TODO: make lc and sa read only
+        lc = "LoadCases = " + str(result.Properties.GetByName("lc").Value)
+        exec lc
+        AnalysisNames = [analysisName for analysisName in LoadCases]
         
-        LoadCases = {}
-        for analysisName in AnalysisNames:
-            LoadCases[analysisName] = range(1,ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.ResultSetCount+1)
+        EdgeByElem = result.Properties.GetByName("EdgeByElem").Value
             
         for analysisName in AnalysisNames:
             Identifier[analysisName] = {}
@@ -155,29 +168,26 @@ def getValue(result,SelemId):
                 Identifier[analysisName][resultSet] = {}
                 # Retrieve the stresses of the elements
                 #maybe ask stress of the nodes who are actual on the line?? I think the element Ids can be easily queried...
-                
+                ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> Load Case: "+str(analysisName)+":"+str(resultSet))
                 ExtAPILogWriteMessage("analysis "+str(analysisName))
                 ExtAPILogWriteMessage("Get raw stresses")
                 Analysis.ResultsData.CurrentResultSet = resultSet
                 resultStress = Analysis.ResultsData.Result("S")
-                for elemId in ExtAPI.DataModel.MeshDataByName("Global").ElementIds:
+                
+                allowableStress = int(result.Properties.GetByName("sa").Value)
+                if allowableStress == 0:
+                    allowableStress = LoadCases[analysisName][resultSet]
+                
+                for elemId in WeldElements:   
+                    # if elemId in (92786,99611,100945): # hack
+                        # continue
                     
-                    ExtAPILogWriteMessage("ELEM: "+str(elemId)) 
+
+                    ExtAPILogWriteMessage(str(datetime.now())+" >>> "+"ELEM: "+str(elemId))
                     Identifier[analysisName][resultSet][elemId]={"2xFW":{}, "2xPP":{}, "1xFW":{}, "1xPP":{}}
-
-                    if elemId not in WeldElements:
-                        ExtAPILogWriteMessage("CONTINUE: elemId not in WeldElements")
-                        continue
-                    # if EdgesByElemId[elemId].Count == 0:
-                        # ExtAPILogWriteMessage("CONTINUE: "+str(elemId)+" Element is not a weld") 
-                        # continue
-                    # if not int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
-                        # ExtAPILogWriteMessage("CONTINUE: Element is not a shell") 
-                        # continue
-
+                    
                     plateThickness = FaceByElemId[elemId].Body.Thickness * 1000   # to mm, this is so ugly
-                    allowableStress = int(result.Properties.GetByName("sa").Value)
-
+                    
                     sxTotal = [abs(x) for x in resultStress.ElementValue(elemId,"X")]
                     syTotal = [abs(x) for x in resultStress.ElementValue(elemId,"Y")]
                     szTotal = [abs(x) for x in resultStress.ElementValue(elemId,"Z")]
@@ -199,22 +209,25 @@ def getValue(result,SelemId):
                     
                     # Determine the edge to calculate with; for elements can be with multiple edges
                     # Contains duplicate calculations to be sure the worst-case edge is taken into account
-                    if result.Properties.GetByName("EdgeByElem").Value == "Envelope":
-                        weldThickness = 0
-                        for edge in EdgesByElemId[elemId]:
-                            units = getNormalDirection(edge, FaceByElemId[elemId]) 
-                            NormalStress = inProduct([sx,sy,sz],units[0])
-                            # CrossStress =  inProduct([sx,sy,sz],units[2])     # HIERVOOR moet je SZY zien te vinden!!!
-                            LongStress =  inProduct([sxy,syz,sxz],units[1]) 
-                            newWeldThickness = ( ( NormalStress**2+3*LongStress**2 )**(0.5) * plateThickness ) / (allowableStress)
-                            if newWeldThickness >= weldThickness:
-                                EdgeWithMaxWeldThickness = edge
-                                weldThickness = newWeldThickness
-                        Edge = EdgeWithMaxWeldThickness
-                    elif result.Properties.GetByName("EdgeByElem").Value == "High Edge Ids":
-                        Edge = max([x.Id for x in EdgesByElemId[elemId]])
-                    elif result.Properties.GetByName("EdgeByElem").Value == "Low Edge Ids":
-                        Edge = min([x.Id for x in EdgesByElemId[elemId]])
+                    if EdgesByElemId[elemId].Count == 1:
+                        Edge = EdgesByElemId[elemId][0]
+                    else:
+                        if EdgeByElem == "Envelope":
+                            weldThickness = 0
+                            for edge in EdgesByElemId[elemId]:
+                                units = getNormalDirection(edge, FaceByElemId[elemId]) 
+                                NormalStress = inProduct([sx,sy,sz],units[0])
+                                # CrossStress =  inProduct([sx,sy,sz],units[2])     # HIERVOOR moet je SZY zien te vinden!!!
+                                LongStress =  inProduct([sxy,syz,sxz],units[1]) 
+                                newWeldThickness = ( ( NormalStress**2+3*LongStress**2 )**(0.5) * plateThickness ) / (allowableStress)
+                                if newWeldThickness >= weldThickness:
+                                    EdgeWithMaxWeldThickness = edge
+                                    weldThickness = newWeldThickness
+                            Edge = EdgeWithMaxWeldThickness
+                        elif EdgeByElem == "High Edge Ids":
+                            Edge = max([x.Id for x in EdgesByElemId[elemId]])
+                        elif EdgeByElem == "Low Edge Ids":
+                            Edge = min([x.Id for x in EdgesByElemId[elemId]])
                     # Calculate the actual weld
                     units = getNormalDirection(Edge, FaceByElemId[elemId]) 
                     NormalStress = inProduct([sxMid,syMid,szMid],units[0])
@@ -249,7 +262,7 @@ def getValue(result,SelemId):
                     Identifier[analysisName][resultSet][elemId]["Longitudinal Unit Vector"]    = unitLongScalar
                     
                     #Iterate towards the minimum throat thickness with Moment uit Las Spanningen, Staal Profielen
-                
+                    
                     a = 5.0
                     for iii in range(195):
                         sigma1 = NormalForce * 1.414 / (4 * a)
@@ -343,36 +356,26 @@ def getValue(result,SelemId):
                     Identifier[analysisName][resultSet][elemId]["1xPP"]["Scaled Axial Stress"]                               = abs(sigma1)
                     Identifier[analysisName][resultSet][elemId]["1xPP"]["Scaled Bending Stress"]                             = abs(sigma2)
                     Identifier[analysisName][resultSet][elemId]["1xPP"]["Scaled Longitudinal Stress"]                        = abs(tau1)
-
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> 01")
-            
+                    ExtAPILogWriteMessage(str(Identifier[analysisName][resultSet][elemId]))
+        ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> Created Results Dictionary...")
     if SelemId not in WeldElements:
         ExtAPILogWriteMessage("CONTINUE: elemId not in WeldElements")
         return []
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> 02")
-    # if not int(result.Analysis.MeshData.ElementById(SelemId).Type) in (5,6,7,8):   #kTri3, kTri6, kQuad4, kQuad8
-        # ExtAPILogWriteMessage("RETURN: Element is not a shell") 
-        # return []
-    # if EdgesByElemId[SelemId].Count == 0:
-        # ExtAPILogWriteMessage("RETURN: Element is not a weld") 
-        # return []
+
     Display = result.Properties.GetByName("Display").Value
     WeldType = result.Properties.GetByName("WeldType").Value
     if Display in ("Throat Thickness","Scaled Longitudinal over Equivalent (von-Mises) Stress", "Scaled Bending over Equivalent (von-Mises) Stress", "Scaled Equivalent (von-Mises) Stress", "Scaled Axial Stress", "Scaled Bending Stress", "Scaled Longitudinal Stress"):
         vals = []
-        for analysisName in AnalysisNames:
-            ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> 04 "+str(analysisName))
-            for resultSet in LoadCases[analysisName]:
-                ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> 05 "+str(resultSet))
+        for analysisName in Identifier:
+            for resultSet in Identifier[analysisName]:
                 vals.append(Identifier[analysisName][resultSet][SelemId][WeldType][Display])
-                ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> 06"+str(vals))
-        return [max(vals)]
+        return [max(vals)*1.0]
     else:
         vals = []
-        for analysisName in AnalysisNames:
-            for resultSet in LoadCases[analysisName]:
+        for analysisName in Identifier:
+            for resultSet in Identifier[analysisName]:
                 vals.append(Identifier[analysisName][resultSet][SelemId][Display])
-        return [max(vals)]
+        return [max(vals)*1.0]
         # return [max([Identifier[analysisName][resultSet][SelemId][WeldType][Display] for resultSet in LoadCases[analysisName] for analysisName in AnalysisNames])]
     
 def selectDisplay(load,prop):
