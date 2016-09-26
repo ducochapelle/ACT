@@ -1,7 +1,9 @@
 # Needs. More. OOD.
+# Maybe the bug out is when mechanical is not closed for 48+ hours?
+# Maybe the bug out can be prevented by FIRST checking the ACT plugins in the project manager and THEN opening the project
 
-# add option to add vertices. 
-#   option: You can even do it cool where if centernode is edge node, pick one from vertex pool.
+# make refresh mesh work when you clicked on this stuff when you didnt even had mesh
+# add color option RGB
 # add warning if midnode is in edgenodes
 # add on activate scope put selection in selection manager
 # make default spoke diameter yellow
@@ -11,44 +13,97 @@
 #   hole hole
 # Evade rotating nodes of model by either using 'CE in direction' or 'double spokes (----||****O****||----) where ( = edge, - = link, || = connection in plane, * = beam, 0 = shaft'
 # add unit of density, diameter and emodulus properly (don't guess, ask ansys!)
-# D uit CP in voor constrain in Z HIGH PRIORITY
+# getRealCenterNode moet sneller
+# Less flood with /nopr
+# when suppressed -> not visible
+# ask area instead of diameter (or maybe even auto-calculate with edge-area-thickness, line length and node count)
+# change spoke diameter to spoke area
 
-
+from math import hypot
 from datetime import datetime
 drawingObjects = {}
 NearestNodeIdByEdgeId = {}
+GlobalLocationByNodeId = {}
+global ColorTable
+ColorTable =    {"Red"       :0xFF0000,
+                 "Maroon"    :0x800000,
+                 "Brown"     :0xA52A2A,
+                 "Orange"    :0xFFA500,
+                 "Yellow"    :0xFFFF00,
+                 "Lime"      :0x00FF00,
+                 "Green"     :0x008000,
+                 "Olive"     :0x808000,
+                 "Cyan"      :0x00FFFF,
+                 "Blue"      :0x0000FF,
+                 "LightBlue" :0xADD8E6,
+                 "DarkBlue"  :0x0000A0,
+                 "Fuchsia"   :0xFF00FF,
+                 "Purple"    :0x800080,
+                 "White"     :0xFFFFFF,
+                 "Silver"    :0xC0C0C0,
+                 "Grey"      :0x808080,
+                 "Black"     :0x000000}
 
+
+def ClearLog():
+    f = open(ExtAPI.Log.LogFilename,'w')
+    f.write("<html>                                        \n")
+    f.write("<head>                                        \n")
+    f.write('<style type="text/css">                       \n')
+    f.write("  .error { color:red; }                       \n")
+    f.write("</style>                                      \n")
+    f.write("De tijd en datum van vandaag                  \n")
+    f.write("</head>                                       \n")
+    f.write("<body>                                        \n")
+    f.write("<br/>                                         \n")
+    f.write("<br/>                                         \n")
+    f.close()
+
+def doClearLog(analysis):
+    ClearLog()
+    
 def ExtAPILogWriteMessage(string):
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+string)
+    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+string)
     pass
     
 def ButtonClick1(analysis):
     load = analysis.CreateLoadObject("CartwheelCP")
                 
-def ShowCartwheel(load):
-    def getRealCenterNode(nodeXYZ,load):
-        MeshData = load.Analysis.MeshData
-        Vertex = load.Properties.GetByName("Vertex").Value
-        LocationByNodeId = {}
-        while True:
-            if Vertex in ("Select Vertex"):
-                VertexIds = load.Properties.GetByName("Vertices").Value.Ids
-                NodeIds = [MeshData.MeshRegionById(VertexId).NodeIds[0] for VertexId in VertexIds]
-            elif Vertex in ("Automatic Vertex"):
-                NodeIds = MeshData.NodeIds
-            elif Vertex in ("Create Vertex"):
-                break
+def getRealCenterNode(location_in_space,load, Vertex, MeshData):
+    ExtAPILogWriteMessage("getRealCenterNode 1")
+    LocationByNodeId = {}
+    if Vertex == "Select Vertex":
+        VertexIds = load.Properties.GetByName("Vertices").Value.Ids
+        NodeIds = [MeshData.MeshRegionById(VertexId).NodeIds[0] for VertexId in VertexIds]
+        for NodeId in NodeIds:
+            node = MeshData.NodeById(NodeId)
+            LocationByNodeId[NodeId] = (node.X,node.Y,node.Z)
+    elif Vertex == "Automatic Vertex":
+        global GlobalLocationByNodeId
+        if GlobalLocationByNodeId == {}:
+            NodeIds = MeshData.NodeIds
             for NodeId in NodeIds:
-                LocationByNodeId[NodeId] = ( MeshData.NodeById(NodeId).X,MeshData.NodeById(NodeId).Y,MeshData.NodeById(NodeId).Z )
-            break
-        ExtAPILogWriteMessage(str(Vertex)+" "+str(LocationByNodeId))    
-        distances = {}
-        for node in LocationByNodeId:
-            distances[node] = ( (LocationByNodeId[node][0] - nodeXYZ[0])**2 + (LocationByNodeId[node][1] - nodeXYZ[1])**2 + (LocationByNodeId[node][2] - nodeXYZ[2])**2 )**(0.5)
-        return min(distances, key=distances.get)
+                node = MeshData.NodeById(NodeId)
+                GlobalLocationByNodeId[NodeId] = (node.X,node.Y,node.Z)
+        LocationByNodeId = GlobalLocationByNodeId
+        
+    # http://stackoverflow.com/questions/16979618/given-a-set-of-locations-and-a-single-location-find-the-closest-location-from-t
+    # http://en.wikipedia.org/wiki/Nearest_neighbor_search
+    # http://en.wikipedia.org/wiki/R-tree
+    closest_node = None
+    closest_distance = 1e100  # An arbitrary, HUGE, value
+    x,y,z = location_in_space[:3]
+    for NodeId, NodeLocation in LocationByNodeId.iteritems():
+        distance = (NodeLocation[0] - x)**2 + (NodeLocation[1] - y)**2 + (NodeLocation[2] - z)**2
+        if distance < closest_distance:
+            closest_distance = distance
+            closest_node = NodeId
+    return closest_node
 
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+"START Cartwheel display")
 
+def ShowCartwheel(load):
+    if load.Analysis.MeshData.NodeCount == 0:
+        return
     global NearestNodeIdByEdgeId
     global drawingObjects
     if not load.Id in drawingObjects:
@@ -62,8 +117,6 @@ def ShowCartwheel(load):
         return
         
     MeshData = load.Analysis.MeshData
-    
-    ExtAPILogWriteMessage("Geom is: "+str(Edges.IsValid)+"...")
 
     rainbow = {0:0xFF0000
               ,1:0xFF6600
@@ -74,16 +127,16 @@ def ShowCartwheel(load):
               ,6:0x0099FF
               ,7:0x3333FF
               ,8:0x990099} ; i = 0
+    global ColorTable
     
     if Edges.IsValid and MeshData.ElementCount:
-        ExtAPILogWriteMessage("1...")
         drawingObjects[load.Id] = ExtAPI.Graphics.CreateAndOpenDraw3DContext()
         drawingObjects[load.Id].Color = load.Color
         drawingObjects[load.Id].LineWeight = 2
+        Color = load.Properties.GetByName("Colors").Value
         pts = System.Array.CreateInstance(float,6)   
         EdgeIds = Edges.Value.Ids
         for EdgeId in EdgeIds:
-            ExtAPILogWriteMessage("2...")
             NodeIds =   MeshData.MeshRegionById(EdgeId).NodeIds
             NodeCount = MeshData.MeshRegionById(EdgeId).NodeCount
             # virtual centernode
@@ -93,24 +146,27 @@ def ShowCartwheel(load):
             if Vertex in ("Automatic Vertex", "Select Vertex"):
                 # real centernode
                 if not EdgeId in NearestNodeIdByEdgeId:
-                    NearestNodeIdByEdgeId[EdgeId] = getRealCenterNode(pts,load)
+                    NearestNodeIdByEdgeId[EdgeId] = getRealCenterNode(pts,load, Vertex, MeshData)
+                    # ExtAPILogWriteMessage("getRealCenterNode 3")
                 nearestNode = NearestNodeIdByEdgeId[EdgeId]
-                ExtAPILogWriteMessage("3... "+str(nearestNode))
                 pts[0] = MeshData.NodeById(nearestNode).X
                 pts[1] = MeshData.NodeById(nearestNode).Y
                 pts[2] = MeshData.NodeById(nearestNode).Z
             for NodeId in MeshData.MeshRegionById(EdgeId).NodeIds:
-                ExtAPILogWriteMessage("4...")
                 pts[3] = MeshData.NodeById(NodeId).X
                 pts[4] = MeshData.NodeById(NodeId).Y
                 pts[5] = MeshData.NodeById(NodeId).Z
-                if load.Properties.GetByName("Colors").Value == "Rainbow":
+                if Color == "Default":
+                    pass
+                elif Color == "Rainbow":
                     drawingObjects[load.Id].Color = rainbow[i] ; i += 1 ; i = i % rainbow.Count
+                elif Color == "Custom":
+                    drawingObjects[load.Id].Color = int(load.Properties.GetByName("RGB").Value,16)
+                else:
+                    drawingObjects[load.Id].Color = ColorTable[Color]
                 drawingObjects[load.Id].DrawPolyline(pts)
         drawingObjects[load.Id].Close()
         drawingObjects[load.Id].Visible = True
-    ExtAPILogWriteMessage(str(drawingObjects))
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+"END Cartwheel display")
 
 def HideCartwheel(load):
     global drawingObjects
@@ -121,7 +177,6 @@ def HideCartwheel(load):
     pass
     
 def CartwheelCP(load, stream):    
-    ExtAPILogWriteMessage("Cartwheel... 666!")
     # Get the scoped geometry:
     propGeo = load.Properties.GetByName("One")
     Vertex = load.Properties.GetByName("Vertex").Value
@@ -152,7 +207,6 @@ def CartwheelCP(load, stream):
     stream.Write("R,zSpokeEtype,"+spokeDiameter.Value+"**2,,-1 \n")
     
     #create spokes
-    stream.Write("C*** halfway cartwheels \n")
     stream.Write("TYPE,zSpokeEtype \n")
     stream.Write("REAL,zSpokeEtype \n")
 
@@ -162,7 +216,7 @@ def CartwheelCP(load, stream):
         nodeIds = meshRegion.NodeIds
         
         #align coordinate system on first three edge nodes
-        stream.Write("/PREP7 \n")
+        # stream.Write("/PREP7 \n")
         stream.Write("CSYS,0 \n")
         stream.Write("NSEL,ALL \n")
         stream.Write("NWPLAN,,"+nodeIds[0].ToString()+","+nodeIds[1].ToString()+","+nodeIds[2].ToString()+" \n")
@@ -212,12 +266,11 @@ def CartwheelCP(load, stream):
             stream.Write("CP,NEXT,UY,ALL \n")       # beam line = Z <--------------------------------------------------------
             stream.Write("CSYS, 4 \n")
             if token == False:
-                stream.Write("NSEL,a,,,shaftNode"+geomId.ToString()+" \n")
-                stream.Write("CP,NEXT,UZ,shaftNode"+geomId.ToString()+",lastNode \n")
+                stream.Write("NSEL,a,,,shaftNode"+geomId.ToString()+" \n") # SHOULD NOT COUPLE nodeId!!! maar het lijkt gewoon te kloppen
+                stream.Write("CP,NEXT,UZ,shaftNode"+geomId.ToString()+",lastNode \n") # Kijk dan, hij coupled aleen shaftnode en lastnode, nooit nodeId!
                 stream.Write("*GET,zNset,CP,0,MAX \n")
                 token = True
             else:
-                stream.Write("C***, handenopelkaar \n")
                 stream.Write("CP,zNset,,lastNode \n")
         token = False
         
@@ -227,6 +280,7 @@ def CartwheelCP(load, stream):
         stream.Write("NROTAT,all \n")
         stream.Write("CSYS,0 \n")
         stream.Write("/SOLU \n")
+        stream.Write(load.Properties.GetByName("nopr").Value + "\n")    #redundant?
         if Vertex == "Create Vertex":
             stream.Write("D,ALL,ALL \n")
         else:
@@ -235,6 +289,7 @@ def CartwheelCP(load, stream):
             if load.Properties.GetByName("ConstrainShaftRot").Value == "Yes":
                 stream.Write("D,ALL,ROTZ,0 \n") # beam line = Z <--------------------------------------------------------
         stream.Write("/PREP7 \n")
+        stream.Write(load.Properties.GetByName("nopr").Value + "\n")    #redundant?
         stream.Write("CSYS,4 \n")
         
     
@@ -281,15 +336,35 @@ def ValidateVertex(load, prop):
         load.Properties.GetByName("ConstrainShaftRot").ReadOnly = True
         load.Properties.GetByName("ConstrainShaftU").Value = "Yes"
         load.Properties.GetByName("ConstrainShaftRot").Value = "Yes"
+    # HideCartwheel(load)
+    # ShowCartwheel(load)
+    pass
+
+def ClearedMesh(load,prop):
+    global GlobalLocationByNodeId
+    GlobalLocationByNodeId = {}
+    global NearestNodeIdByEdgeId
+    NearestNodeIdByEdgeId = {}
     HideCartwheel(load)
     ShowCartwheel(load)
 
+def IsValid(foo,bar):
+    return True
+    
 def SelectColors(load,prop):
     prop.ClearOptions()
     prop.AddOption("Default")
     prop.AddOption("Rainbow")
+    prop.AddOption("Custom")
+    global ColorTable
+    for c in ColorTable:
+        prop.AddOption(c)
     HideCartwheel(load)
     ShowCartwheel(load)
+
+def ValidateColors(load,prop):
+    load.Properties.GetByName("RGB").Visible = True if prop.Value == "Custom" else False
+
     
 def SelectNopr(load,prop):
     prop.ClearOptions()
