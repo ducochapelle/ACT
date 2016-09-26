@@ -1,0 +1,35 @@
+<extension version="1" name="ElemNumber">
+    <script src="[ext.Folder]\main.py"/>
+    <interface context="Mechanical">
+        <images>[ext.Folder]\images</images>
+        <toolbar name="APDL" caption="HI-Toolbar">
+            <entry name="ElemNumber" icon="ElemNumber">
+                <callbacks>
+                    <onclick>createElemNumber</onclick>
+                </callbacks>
+            </entry>
+        </toolbar>
+    </interface>
+    <simdata context="Mechanical">
+        <result name="ElemNumber" version="1" caption="Element Number" icon="ElemNumber" location="element" type="scalar">
+            <callbacks>
+                <getvalue>getElemNumber</getvalue>
+				<onshow>showElement</onshow>
+				<onhide>hideElement</onhide>
+            </callbacks>
+            <details>
+                <property name="ElemNumber" caption="Element Number" datatype="int" control="text" default="0">	
+					<callbacks>
+						<onvalidate>validateElement</onvalidate>
+					</callbacks>
+                </property>
+                <property name="Style" caption="Style" datatype="string" control="select" default="Fancy">	
+					<callbacks>
+						<onactivate>selectStyle</onactivate>
+						<onvalidate>validateElement</onvalidate>
+					</callbacks>
+                </property>
+            </details>
+        </result>
+    </simdata>
+</extension>

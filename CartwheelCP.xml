@@ -1,0 +1,65 @@
+<extension version="1" name="CartwheelCP">
+  <script src="[ext.Folder]\main.py" />
+  <interface context="Mechanical">
+    <images>[ext.Folder]\images</images>
+	<oninit>doClearLog</oninit>
+    <toolbar name="APDL" caption="HI-Toolbar">
+      <entry name="CartwheelCP" icon="CartwheelCP">
+        <callbacks>
+           <onclick>ButtonClick1</onclick>
+        </callbacks>
+      </entry>
+    </toolbar>
+  </interface>
+  <simdata context="Mechanical">
+    <load name="CartwheelCP" caption="Cart wheels" icon="CartwheelCP" issupport="false" isload="true" color="#0000FF" version="1">
+      <callbacks>
+        <getsolvecommands order="1">CartwheelCP</getsolvecommands>
+        <onhide>HideCartwheel</onhide>
+		<onshow>ShowCartwheel</onshow>
+      </callbacks>
+      <details>
+        <property name="One" caption="Edges" datatype="string" control="scoping"></property>
+        <property name="Vertices" caption="Vertices" datatype="string" control="scoping" visible="false"></property>
+		<property name="Vertex" datatype="string" control="select" default="Automatic Vertex">
+		  <callbacks>
+		    <onactivate>SelectVertex</onactivate>
+			<onvalidate>ValidateVertex</onvalidate>
+		  </callbacks>
+		</property>
+        <property name="SpokeDiameter" caption="Spoke diameter" datatype="string" control="text" default="30"></property>
+		<property name="ConstrainShaftU" caption="Axial displacement fix" datatype="string" control="select">
+		  <callbacks>
+		    <onactivate>SelectConstrainShaft</onactivate>
+		  </callbacks>
+	    </property>
+		<property name="ConstrainShaftRot" caption="Axial rotation fix" datatype="string" control="select">
+		  <callbacks>
+		    <onactivate>SelectConstrainShaft</onactivate>
+		  </callbacks>
+	    </property>
+		<property name="Density" caption="Density [tonne/mm3]" datatype="string" control="text" default="7.86e-12"></property>
+		<property name="Emodulus" caption="E-modulus [MPa]" datatype="string" control="text" default="2.1e5"></property>
+		<property name="Colors" caption="Colors" datatype="string" control="select" default="Default">
+		  <callbacks>
+		    <onactivate>SelectColors</onactivate>
+		  </callbacks>
+		</property>
+		<property name="ClearedMesh" caption="Refresh Mesh" datatype="string" control="applycancel" default="Refresh Mesh">
+		  <callbacks>
+		    <onapply>ClearedMesh</onapply>
+			<isvalid>IsValid</isvalid>
+		  </callbacks>
+		</property>
+		<property name="nopr" caption="Input data" datatype="string" control="select" default="/NOPR">
+		  <callbacks>
+		    <onactivate>SelectNopr</onactivate>
+		  </callbacks>
+		</property>
+      </details>
+    </load>
+  </simdata>
+</extension>
+
+
+
