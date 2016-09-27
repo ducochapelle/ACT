@@ -35,6 +35,7 @@ def showElement(result):
     #draw nice counters depending on element type
     
     pts = System.Array.CreateInstance(float,6)   
+    # "Obsolete, use Create3DContext instead," I'll deal with that later
     ctxCartwheel = ExtAPI.Graphics.CreateAndOpenDraw3DContext()
     ctxCartwheel.Color = 0xFF0000
     ctxCartwheel.LineWeight = 2

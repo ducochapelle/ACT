@@ -47,23 +47,6 @@ if ExtAPI.Context == "Mechanical":
 def ExtAPILogWriteMessage(string):
     # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
     pass
-
-def ClearLog():
-    f = open(ExtAPI.Log.LogFilename,'w')
-    f.write("<html>                                        \n")
-    f.write("<head>                                        \n")
-    f.write('<style type="text/css">                       \n')
-    f.write("  .error { color:red; }                       \n")
-    f.write("</style>                                      \n")
-    f.write(str(datetime.now())                               )
-    f.write("</head>                                       \n")
-    f.write("<body>                                        \n")
-    f.write("<br/>                                         \n")
-    f.write("<br/>                                         \n")
-    f.close()
-    
-def doClearLog(analysis):
-    ClearLog()
     
 def DefaultLoadCases():
     LoadCases = {}
@@ -666,7 +649,6 @@ def ClearResults(result, prop):
     EdgesByElemId = {}
     global Data
     Data.pop(Identifier, None)
-    ClearLog()
     
 def IsValid(foo,bar):
     return True

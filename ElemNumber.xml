@@ -12,13 +12,14 @@
         </toolbar>
     </interface>
     <simdata context="Mechanical">
-        <result name="ElemNumber" version="1" caption="Element Number" icon="ElemNumber" location="element" type="scalar">
+        <result name="ElemNumber" version="1" caption="Element Number" icon="ElemNumber" location="element" type="scalar" contextual="false">
             <callbacks>
                 <getvalue>getElemNumber</getvalue>
 				<onshow>showElement</onshow>
 				<onhide>hideElement</onhide>
             </callbacks>
             <details>
+                <property name="Geometry" caption="Geometry" control="scoping"></property>
                 <property name="ElemNumber" caption="Element Number" control="text" default="0">	
 					<callbacks>
 						<onvalidate>validateElement</onvalidate>
