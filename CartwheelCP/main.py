@@ -43,24 +43,6 @@ if ExtAPI.Context == "Mechanical":
                      "Silver"    :0xC0C0C0,
                      "Grey"      :0x808080,
                      "Black"     :0x000000}
-
-
-def ClearLog():
-    f = open(ExtAPI.Log.LogFilename,'w')
-    f.write("<html>                                        \n")
-    f.write("<head>                                        \n")
-    f.write('<style type="text/css">                       \n')
-    f.write("  .error { color:red; }                       \n")
-    f.write("</style>                                      \n")
-    f.write("De tijd en datum van vandaag                  \n")
-    f.write("</head>                                       \n")
-    f.write("<body>                                        \n")
-    f.write("<br/>                                         \n")
-    f.write("<br/>                                         \n")
-    f.close()
-
-def doClearLog(analysis):
-    ClearLog()
     
 def ExtAPILogWriteMessage(string):
     # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+string)
@@ -147,7 +129,7 @@ def ShowCartwheel(load):
                 # real centernode
                 if not EdgeId in NearestNodeIdByEdgeId:
                     NearestNodeIdByEdgeId[EdgeId] = getRealCenterNode(pts,load, Vertex, MeshData)
-                    # ExtAPILogWriteMessage("getRealCenterNode 3")
+                    ExtAPILogWriteMessage("getRealCenterNode 3")
                 nearestNode = NearestNodeIdByEdgeId[EdgeId]
                 pts[0] = MeshData.NodeById(nearestNode).X
                 pts[1] = MeshData.NodeById(nearestNode).Y
