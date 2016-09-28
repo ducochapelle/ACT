@@ -45,7 +45,7 @@ if ExtAPI.Context == "Mechanical":
     weldThroats = range(5,25,1) + range(25,50,5) + range(50,100,10) + [100,120,150,200]
 
 def ExtAPILogWriteMessage(string):
-    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
+    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
     pass
     
 def DefaultLoadCases():
@@ -692,6 +692,7 @@ def addFatigueSlaves(result, prop):
             ResultObject = result.Analysis.CreateResultObject("Slave")
             SProp = ResultObject.Properties
             if nc == "Static": SProp.GetByName("Item").Value  = "K-factor"
+            SProp.GetByName("Geometry").Value               = MProp.GetByName("Geometry").Value
             SProp.GetByName("Identifier").Value             = MProp.GetByName("Identifier").Value
             SProp.GetByName("FatigueCalculation").Value     = MProp.GetByName("FatigueCalculation").Value 
             SProp.GetByName("lc").Value                     = str(ConvertLoadCases(eval(MProp.GetByName("lc").Value)))
@@ -715,6 +716,7 @@ def addStaticSlaves(result, prop):
         for wt in ["2xFW", "2xPP", "1xPP"]:
             ResultObject = result.Analysis.CreateResultObject("Slave")
             SProp = ResultObject.Properties
+            SProp.GetByName("Geometry").Value               = MProp.GetByName("Geometry").Value
             SProp.GetByName("Identifier").Value             = MProp.GetByName("Identifier").Value
             SProp.GetByName("FatigueCalculation").Value     = MProp.GetByName("FatigueCalculation").Value 
             if i == 1: # needs range(2)...
@@ -778,6 +780,7 @@ def addMoreSlaves(result,prop):      # this option is intended for debuggin only
             ResultObject = result.Analysis.CreateResultObject("Slave")
             SProp = ResultObject.Properties
             SProp.GetByName("Item").Value                   = item
+            Sprop.GetByName("Geometry").Value               = MProp.GetByName("Geometry").Value
             SProp.GetByName("Identifier").Value             = MProp.GetByName("Identifier").Value
             SProp.GetByName("FatigueCalculation").Value     = MProp.GetByName("FatigueCalculation").Value 
             SProp.GetByName("lc").Value                     = str(ConvertLoadCases(eval(MProp.GetByName("lc").Value)))

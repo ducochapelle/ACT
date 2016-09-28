@@ -1,9 +1,9 @@
 <extension version="1" name="MasterSlaveWeld">
+	<guid>28941fd9-4822-48f7-a6cb-7a5704faa560</guid>
     <script src="main.py"/>
     <interface context="Mechanical">
-		<oninit>doClearLog</oninit>
         <images>images</images>
-        <toolbar name="APDL1" caption="HI-Toolbar1">
+        <toolbar name="DCH-Toolbar3" caption="DCH-Toolbar">
             <entry name="Master" icon="WeldMaster">
                 <callbacks>
                     <onclick>createMaster</onclick>
@@ -12,52 +12,54 @@
         </toolbar>
     </interface>
     <simdata context="Mechanical">
-        <result name="Master" version="1" caption="Weld Master" icon="WeldMaster" location="element" type="scalar">
+        <result name="Master" version="1" caption="Weld Master" icon="WeldMaster" location="element" type="scalar" contextual="false">
             <callbacks>
 				<onstarteval>createDB</onstarteval>
 				<onendeval>destroyDB</onendeval>
             </callbacks>
             <details>
-				<property name="Identifier" 		caption="Identifier" 			datatype="string" control="text" 	default="1a2a3a" 					readonly="true">			</property>
-				<property name="FatigueCalculation" caption="Fatigue" 				datatype="string" control="select" 	default="No"						readonly="true"><callbacks>
-					<onactivate>selectFatigueCalculation</onactivate>
-					<onvalidate>validateFatigueCalculation</onvalidate> 																									</callbacks></property>
-                <property name="lc" 				caption="Static Load Cases" 	datatype="string" control="text" 	default="{}"						readonly="true"><callbacks>
-					<onvalidate>validateLoadCases</onvalidate>																												</callbacks></property>
-                <property name="lcFatigue" 			caption="Fatigue Load Cases" 	datatype="string" control="text" 	default="{}" 		visible="false" readonly="true"><callbacks>
-					<onvalidate>validateLoadCases</onvalidate>																												</callbacks></property>
-				<property name="CraneGroup" 		caption="Crane Group" 			datatype="string" control="select" 	default="B2" 		visible="false" readonly="true"><callbacks>
-					<onactivate>selectCraneGroup</onactivate>
-					<onvalidate>validateCraneGroup</onvalidate>																												</callbacks></property>
-				<property name="addSlaves" 			caption="Spawn Result Objects" 	datatype="string" control="applycancel" default=" "						readonly="true"><callbacks>
-					<onapply>addSlaves</onapply>
-					<oncancel>addMoreSlaves</oncancel>
-					<isvalid>IsValid</isvalid> 																																</callbacks></property>
-				<property name="ClearResults" 		caption="Clear Results" 		datatype="string" control="applycancel" default=" "										><callbacks>
-					<onapply>ClearResults</onapply>
-					<isvalid>IsValid</isvalid>																																</callbacks></property>
-				<property name="empty" 				caption=" " 					datatype="string" control="text" 	default=" " 						readonly="true">			</property>
-                <property name="EdgeByElem" 		caption="Corner Elements" 		datatype="string" control="select" 	default="Envelope"					readonly="true"><callbacks>
-					<onactivate>selectEdgeByElem</onactivate>																												</callbacks></property> 
-                <property name="EdgeOfModel" 		caption="Edge of model" 		datatype="string" control="select" 	default="Exclude"					readonly="true"><callbacks>
-					<onactivate>selectEdgeOfModel</onactivate>																												</callbacks></property>
+                <property name="Geometry" caption="Geometry" control="scoping"></property>
+                <property name="Identifier" caption="Identifier" control="text" default="1a2a3a" readonly="true"> </property>
+                <property name="FatigueCalculation" caption="Fatigue" control="select" default="No" readonly="true"><callbacks>
+                    <onactivate>selectFatigueCalculation</onactivate>
+                    <onvalidate>validateFatigueCalculation</onvalidate> </callbacks></property>
+                <property name="lc" caption="Static Load Cases" control="text" default="{}" readonly="true"><callbacks>
+                    <onvalidate>validateLoadCases</onvalidate> </callbacks></property>
+                <property name="lcFatigue" caption="Fatigue Load Cases" control="text" default="{}" visible="false" readonly="true"><callbacks>
+                    <onvalidate>validateLoadCases</onvalidate> </callbacks></property>
+                <property name="CraneGroup" caption="Crane Group" control="select" default="B2" visible="false" readonly="true"><callbacks>
+                    <onactivate>selectCraneGroup</onactivate>
+                    <onvalidate>validateCraneGroup</onvalidate> </callbacks></property>
+                <property name="addSlaves" caption="Spawn Result Objects" control="applycancel" default=" " readonly="true"><callbacks>
+                    <onapply>addSlaves</onapply>
+                    <oncancel>addMoreSlaves</oncancel>
+                    <isvalid>IsValid</isvalid> </callbacks></property>
+                <property name="ClearResults" caption="Clear Results" control="applycancel" default=" " ><callbacks>
+                    <onapply>ClearResults</onapply>
+                    <isvalid>IsValid</isvalid> </callbacks></property>
+                <property name="empty" caption=" " control="text" default=" " readonly="true"> </property>
+                <property name="EdgeByElem" caption="Corner Elements" control="select" default="Envelope" readonly="true"><callbacks>
+                    <onactivate>selectEdgeByElem</onactivate> </callbacks></property> 
+                <property name="EdgeOfModel" caption="Edge of model" control="select" default="Exclude" readonly="true"><callbacks>
+                    <onactivate>selectEdgeOfModel</onactivate> </callbacks></property>
             </details>
         </result>
-        <result name="Slave" version="1" caption="Weld Slave" icon="WeldSlave" location="element" type="scalar">
+        <result name="Slave" version="1" caption="Weld Slave" icon="WeldSlave" location="element" type="scalar" contextual="false">
             <callbacks>
 				<onstarteval>startSlave</onstarteval>
                 <getvalue>getValue</getvalue>
 				<onendeval>endSlave</onendeval>
             </callbacks>
             <details>
-				<property name="Identifier" caption="Identifier" 			datatype="string" control="text" 	default="1a2a3a" 			readonly="true"	visible="true" 	></property>
-				<property name="FatigueCalculation" caption="Fatigue" 		datatype="string" control="select" 	default="No"				readonly="true" visible="false"	></property>
-                <property name="Item" 		caption="Item" 					datatype="string" control="select" 	default="Throat Thickness" 	readonly="true"	visible="true"	></property>
-                <property name="WeldType" 	caption="Weld Type" 			datatype="string" control="select" 	default="2xFW" 				readonly="true"	visible="true"	></property>
-				<property name="NotchCase" 	caption="Notch Case" 			datatype="string" control="select" 	default="Static"			readonly="true" visible="true"	></property>
-                <property name="CraneGroup" caption="Crane Group" 			datatype="string" control="select" 	default="B0" 				readonly="true" visible="false"	></property>
-				<property name="lc" 		caption="Static Load Cases" 	datatype="string" control="text" 	default="{}" 				readonly="true"	visible="false"	></property>
-				<property name="lcFatigue" 	caption="Fatigue Load Cases" 	datatype="string" control="text" 	default="{}" 				readonly="true"	visible="false"	></property>
+                <property name="Geometry" caption="Geometry" control="scoping"></property>
+				<property name="Identifier" caption="Identifier" 			control="text" 	default="1a2a3a" 			readonly="true"	visible="true" 	></property>
+				<property name="FatigueCalculation" caption="Fatigue" 	control="select" 	default="No"				readonly="true" visible="false"	></property>
+                <property name="Item" 		caption="Item" 				control="select" 	default="Throat Thickness" 	readonly="true"	visible="true"	></property>
+                <property name="WeldType" 	caption="Weld Type" 		control="select" 	default="2xFW" 				readonly="true"	visible="true"	></property>
+				<property name="NotchCase" 	caption="Notch Case" 		control="select" 	default="Static"			readonly="true" visible="true"	></property>
+                <property name="CraneGroup" caption="Crane Group" 		control="select" 	default="B0" 				readonly="true" visible="false"	></property>
+				<property name="lc" 		caption="Static Load Cases" 	control="text" 	default="{}" 				readonly="true"	visible="false"	></property>
+				<property name="lcFatigue" 	caption="Fatigue Load Cases" 	control="text" 	default="{}" 				readonly="true"	visible="false"	></property>
             </details>
         </result>
     </simdata>
