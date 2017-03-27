@@ -304,14 +304,14 @@ def ValidateVertex(load, prop):
         load.Properties.GetByName("Vertices").Visible = False
         load.Properties.GetByName("ConstrainShaftU").ReadOnly = False
         load.Properties.GetByName("ConstrainShaftRot").ReadOnly = False
-        load.Properties.GetByName("ConstrainShaftU").Value = "No"
-        load.Properties.GetByName("ConstrainShaftRot").Value = "No"
+        # load.Properties.GetByName("ConstrainShaftU").Value = "No"
+        # load.Properties.GetByName("ConstrainShaftRot").Value = "No"
     elif prop.Value == "Select Vertex":
         load.Properties.GetByName("Vertices").Visible = True
         load.Properties.GetByName("ConstrainShaftU").ReadOnly = False
         load.Properties.GetByName("ConstrainShaftRot").ReadOnly = False
-        load.Properties.GetByName("ConstrainShaftU").Value = "No"
-        load.Properties.GetByName("ConstrainShaftRot").Value = "No"
+        # load.Properties.GetByName("ConstrainShaftU").Value = "No"
+        # load.Properties.GetByName("ConstrainShaftRot").Value = "No"
     elif prop.Value == "Create Vertex":
         load.Properties.GetByName("Vertices").Visible = False
         load.Properties.GetByName("ConstrainShaftU").ReadOnly = True
