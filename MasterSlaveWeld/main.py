@@ -42,17 +42,21 @@ if ExtAPI.Context == "Mechanical":
 
     # NotchCases = ["W0","W1","W2","K0","K1","K2","K3","K3/4","K4"]
     NotchCases = ["K0","K1","K2","K3"]
-    weldThroats = range(5,25,1) + range(25,50,5) + range(50,100,10) + [100,120,150,200]
+    weldThroats = range(3,25,1) + range(25,50,5) + range(50,100,10) + [100,120,150,200]
 
 def ExtAPILogWriteMessage(string):
-    ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
+    # ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> "+str(string))
+    # with open("c:\\TEMP\\act.log",'a') as log: # built in logger won't display if there are too many errors or smt.
+        # log.write(str(datetime.now())+" >>> "+str(string)+"\n")
     pass
+# with open("c:\\TEMP\\act.log", 'w') as log:
+    # log.write("If your log was just a text file instead of some 'socket' I could debug the fucking log\n")
     
 def DefaultLoadCases():
     LoadCases = {}
     AnalysisNames = ExtAPI.DataModel.AnalysisNames
     for analysisName in AnalysisNames:
-        if "Linear Buckling" in analysisName:
+        if "Eigenvalue Buckling" in analysisName:
             continue
         try:
             temp = ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.Result("S")
@@ -414,6 +418,7 @@ def createDB(result,step):
                             DeepData["Scaled Bending over Equivalent (von-Mises) Stress"]      = a
                             DeepData["Scaled Longitudinal over Equivalent (von-Mises) Stress"] = a
                             ExtAPILogWriteMessage("CreateDB: Found a > 200")
+                            # ExtAPILogWriteMessage("NormalStress {} LongStress {} TensorTop.Normal {} TensorMid.Normal {} plateThickness {}".format(NormalStress,LongStress,TensorTop.Normal,TensorMid.Normal,plateThickness)) # FFFUUUUU
     ExtAPI.Log.WriteMessage(str(datetime.now())+" >>> CreateDB: Finished Static Without Errors")
     if not result.Properties.GetByName("FatigueCalculation").Value == "No": 
         #static calculation performence should not be affected at any rate by fatigue calculation
