@@ -59,12 +59,12 @@ def DefaultLoadCases():
         if "Eigenvalue Buckling" in analysisName:
             continue
         try:
-            temp = ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.Result("S")
+            temp = ExtAPI.DataModel.AnalysisByName(analysisName).GetResultsData().GetResult("S")
             del temp
         except:
             continue
         LoadCases[analysisName] = {}
-        for set in [int(x) for x in ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.ListTimeFreq if x == float(int(x))]:
+        for set in [int(x) for x in ExtAPI.DataModel.AnalysisByName(analysisName).GetResultsData().ListTimeFreq if x == float(int(x))]:
             LoadCases[analysisName][set]=230
     return LoadCases
 
@@ -77,7 +77,7 @@ def ConvertLoadCases(lc_time):
     lc_step = {}
     for analysisName in lc_time:
         d = {}
-        ListTimeFreq = ExtAPI.DataModel.AnalysisByName(analysisName).ResultsData.ListTimeFreq
+        ListTimeFreq = ExtAPI.DataModel.AnalysisByName(analysisName).GetResultsData().ListTimeFreq
         for time in lc_time[analysisName]:
             d[ListTimeFreq.IndexOf(float(time))+1] = lc_time[analysisName][time]
         lc_step[analysisName]=d
@@ -120,7 +120,7 @@ def validateLoadCases(result, property):
                 property.Value = str(DefaultLoadCases())
             Analysis = ExtAPI.DataModel.AnalysisByName(analysisName)
             for resultSet in LoadCases[analysisName]:
-                if Analysis.ResultsData.ResultSetCount < resultSet:
+                if Analysis.GetResultsData().ResultSetCount < resultSet:
                     ExtAPI.Application.LogWarning("Analysis "+str(analysisName)+" has no step "+str(resultSet)+".")
                     property.Value = str(DefaultLoadCases())
                 sa = LoadCases[analysisName][resultSet]
@@ -234,8 +234,8 @@ def createDB(result,step):
                                     if not edge.Id in [x.Id for x in EdgesByElemId[ConnectedElementId]]:
                                         ExtAPILogWriteMessage("CreateDB: EdgesByElemId")
                                         EdgesByElemId[ConnectedElementId].append(edge)
+                        ExtAPILogWriteMessage("CreateDB: FaceByElemId")
                         for ElementId in Mesh.MeshRegionById(face.Id).ElementIds:
-                            ExtAPILogWriteMessage("CreateDB: FaceByElemId")
                             FaceByElemId[ElementId] = face
         ExtAPILogWriteMessage("CreateDB: WeldElements")
         for elem in Mesh.ElementIds:                                       
@@ -252,7 +252,7 @@ def createDB(result,step):
         LoadCases = ConvertLoadCases(eval(result.Properties.GetByName("lc").Value))
         EdgeByElem = result.Properties.GetByName("EdgeByElem").Value
         # first halve of calculation is forEachAnalysis(forEachElement) 
-        # for performence because .ResultsData takes seconds to load.
+        # for performence because .GetResultsData() takes seconds to load.
         # alternatively, maybe ask all element results in one ElementValues with an s.
         ExtAPILogWriteMessage("CreateDB: Identifier FirstLoop")
         for analysisName in LoadCases: 
@@ -262,8 +262,8 @@ def createDB(result,step):
                 Data[Identifier][analysisName][resultSet] = {}
                 #maybe ask stress of the nodes who are actual on the line?? 
                 #I think the element Ids can be easily queried...
-                Analysis.ResultsData.CurrentResultSet = resultSet
-                resultStress = Analysis.ResultsData.Result("S")
+                Analysis.GetResultsData().CurrentResultSet = resultSet
+                resultStress = Analysis.GetResultsData().GetResult("S")
                 allowableStress = LoadCases[analysisName][resultSet]
                 
                 for elemId in WeldElements:   
@@ -275,12 +275,18 @@ def createDB(result,step):
                     DeepData = Data[Identifier][analysisName][resultSet][elemId]["None"]["Static"]
                     plateThickness = FaceByElemId[elemId].Body.Thickness * 1000   # to mm, this is so ugly
                     # stresses are no longer abs() -> check rest of this indent careful for consequences
-                    sxxTotal = resultStress.ElementValue(elemId,"X")
-                    syyTotal = resultStress.ElementValue(elemId,"Y")
-                    szzTotal = resultStress.ElementValue(elemId,"Z")
-                    sxyTotal = resultStress.ElementValue(elemId,"XY")
-                    syzTotal = resultStress.ElementValue(elemId,"YZ")
-                    sxzTotal = resultStress.ElementValue(elemId,"XZ")
+                    resultStress.SelectComponents(["X"])
+                    sxxTotal = resultStress.GetElementValues(elemId)
+                    resultStress.SelectComponents(["Y"])
+                    syyTotal = resultStress.GetElementValues(elemId)
+                    resultStress.SelectComponents(["Z"])
+                    szzTotal = resultStress.GetElementValues(elemId)
+                    resultStress.SelectComponents(["XY"])
+                    sxyTotal = resultStress.GetElementValues(elemId)
+                    resultStress.SelectComponents(["YZ"])
+                    syzTotal = resultStress.GetElementValues(elemId)
+                    resultStress.SelectComponents(["XZ"])
+                    sxzTotal = resultStress.GetElementValues(elemId)
                     
                     #0:4 = top plane, 4:8 = bottom plane, 8:12 = mid plane
                     sxx = sum(sxxTotal[0:4],0.0)/4  
@@ -1002,7 +1008,7 @@ class SlaveProperties:
 def startSlave(result,step):
     # check if this is the last step, doe het alleen op de last step?
     global sp
-    if result.Analysis.ResultsData.ResultSetCount != step:
+    if result.Analysis.GetResultsData().ResultSetCount != step:
         sp = None
         return
     ExtAPI.Log.WriteMessage("{0} Step: {3}, Start Slave Id: {1}, Item: {2}".format(str(datetime.now()), str(result.Properties.GetByName("Identifier").Value), str(result.Caption), str(step)))
